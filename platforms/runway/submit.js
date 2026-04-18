@@ -235,6 +235,22 @@ export function parseRunwayTaskResponse(resp) {
   if (!taskNode?.id) return null;
   const progressRatio = taskNode.progressRatio != null ? Number(taskNode.progressRatio) : null;
   const artifacts = Array.isArray(taskNode.artifacts) ? taskNode.artifacts : [];
+
+  // Runway 失败时各种错误字段都可能出现，全部归一化到 error 对象里：
+  //   error / failure / failureReason / errorReason / errorMessage / failureCode / errorCode
+  // 让 formatRunwayError 决定怎么拼显示文案
+  let error = null;
+  if (taskNode.error || taskNode.failure || taskNode.failureReason || taskNode.errorReason ||
+      taskNode.failureCode || taskNode.errorCode || taskNode.errorMessage) {
+    error = {
+      reason: taskNode.failureReason || taskNode.errorReason || taskNode.failure || null,
+      code: taskNode.failureCode || taskNode.errorCode || null,
+      message: taskNode.errorMessage || (typeof taskNode.error === 'string' ? taskNode.error : null),
+      // 把原 error 对象也带上（如果是对象），formatRunwayError 兜底会用
+      raw: taskNode.error && typeof taskNode.error === 'object' ? taskNode.error : null
+    };
+  }
+
   return {
     taskId: taskNode.id,
     status: mapRunwayStatus(taskNode.status),
@@ -245,7 +261,7 @@ export function parseRunwayTaskResponse(resp) {
     estimatedTimeToStartSeconds: taskNode.estimatedTimeToStartSeconds ?? null,
     videoUrl: artifacts[0]?.url || null,
     thumbnailUrl: artifacts[0]?.previewUrls?.[0] || null,
-    error: taskNode.error || null,
+    error,
     rawData: taskNode
   };
 }

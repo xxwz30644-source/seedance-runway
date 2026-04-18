@@ -22,6 +22,48 @@ import { RUNWAY_QUEUE } from './platforms/runway/config.js';
 // Runway 日上限：账号风险缓解，单日累计提交不超过 80 条
 const RUNWAY_DAILY_CAP = 80;
 
+/**
+ * 把 Runway 返回的 error 字段转成「Runway 服务端：xxx（CODE）」格式的可显示字符串。
+ *
+ * 设计原则：用户必须知道是 Runway 平台拒绝（区别于网络错误、客户端 bug），
+ * 所以**强制带「Runway 服务端：」前缀 + 平台原文（reason/code）**，不翻译、不吞错。
+ *
+ * Runway 失败时常见 reason / code：
+ *   SAFETY               — 内容审核（提示词/参考图触发安全策略）
+ *   INTERNAL_ERROR       — 平台内部错
+ *   INVALID_INPUT        — 参数格式不对
+ *   ASSET_INVALID        — 参考图损坏 / 格式不支持
+ *   THROTTLED_FOR_TOO_LONG — 排队太久被踢
+ */
+function formatRunwayError(err, status = 'failed', rawStatus = '') {
+  const tag = status === 'cancelled' ? '任务已取消' : 'Runway 服务端';
+  const fallback = status === 'cancelled' ? tag : `${tag}：任务失败`;
+
+  if (err == null) {
+    return rawStatus ? `${fallback}（${rawStatus}）` : fallback;
+  }
+  if (typeof err === 'string') {
+    return `${tag}：${err}`;
+  }
+  if (typeof err === 'object') {
+    const reason = (typeof err.reason === 'string' && err.reason)
+                || (typeof err.message === 'string' && err.message)
+                || (err.reason && typeof err.reason.message === 'string' && err.reason.message)
+                || null;
+    const code = (typeof err.code === 'string' && err.code) || null;
+
+    if (reason && code) return `${tag}：${reason}（${code}）`;
+    if (reason)         return `${tag}：${reason}`;
+    if (code)           return `${tag}：${code}`;
+
+    if (err.raw && typeof err.raw === 'object') {
+      try { return `${tag}：${JSON.stringify(err.raw)}`; } catch { /* fall through */ }
+    }
+    try { return `${tag}：${JSON.stringify(err)}`; } catch { return fallback; }
+  }
+  return `${tag}：${String(err)}`;
+}
+
 const DEFAULT_IMAGEX_API_HOST = 'imagex.volcengineapi.com';
 const DEFAULT_UPLOAD_HOST = 'tos-lf-x.snssdk.com';
 const DEFAULT_MAX_CONCURRENT_TASKS = 3;
@@ -567,7 +609,16 @@ class BatchManager {
         } else {
           console.error('任务处理失败:', error);
           task.status = 'failed';
-          task.error = error.message;
+          // Runway 服务端错误（callRunway 抛出的 err 带 body / status）：
+          // 走 formatRunwayError 加「Runway 服务端」前缀；其余错误用 error.message 兜底
+          if (task.platform === 'runway' && (error.body || error.status)) {
+            const wrapped = error.body && typeof error.body === 'object'
+              ? error.body
+              : { reason: error.message, code: error.status ? `HTTP ${error.status}` : null };
+            task.error = formatRunwayError(wrapped, 'failed');
+          } else {
+            task.error = error.message || '任务失败';
+          }
           await this.saveTasks();
           this.submittedThisRun = false;
           this.ensureAutoDispatchStoppedWhenIdle();
@@ -1606,7 +1657,7 @@ class BatchManager {
 
     if (update.status === 'failed' || update.status === 'cancelled') {
       task.status = update.status;
-      task.error = update.error?.message || update.error || (update.status === 'cancelled' ? '任务已取消' : '任务失败');
+      task.error = formatRunwayError(update.error, update.status, update.rawStatus);
       task.queueInfo = null;
       this.runningTasks.delete(runwayTaskId);
       await this.saveTasks();

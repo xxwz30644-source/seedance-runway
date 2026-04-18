@@ -180,8 +180,15 @@ function renderTaskCard(task) {
     actions.push(`<button data-action="delete" data-task-id="${task.id}">删除</button>`);
   }
 
-  const errorHtml = task.error
-    ? `<div class="task-error">${escapeHtml(task.error)}</div>`
+  // 防御：历史数据里 task.error 可能是对象（旧 bug 残留），coerce 一次
+  const errorText = task.error == null
+    ? ''
+    : (typeof task.error === 'string'
+        ? task.error
+        : (task.error.message
+            || (() => { try { return JSON.stringify(task.error); } catch { return '任务失败'; } })()));
+  const errorHtml = errorText
+    ? `<div class="task-error">${escapeHtml(errorText)}</div>`
     : '';
 
   const promptText = task.promptText || task.config?.prompt || '(无提示词)';
