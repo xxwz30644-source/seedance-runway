@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Runway 测试控制台</title>
+  <style>
+    body { font: 13px/1.5 -apple-system, "Segoe UI", sans-serif; max-width: 760px; margin: 24px auto; padding: 0 16px; color: #222; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    .sub { color: #888; font-size: 12px; margin-bottom: 24px; }
+    .card { border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+    .card h2 { font-size: 14px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+    .card h2 .step { background: #7c3aed; color: white; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
+    .card .hint { color: #666; font-size: 12px; margin: 0 0 10px; }
+    .row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+    .row label { min-width: 110px; font-weight: 500; font-size: 12px; }
+    .row input, .row textarea { flex: 1; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font: inherit; font-family: ui-monospace, monospace; font-size: 11px; }
+    .row textarea { resize: vertical; min-height: 28px; max-height: 80px; }
+    button { padding: 6px 12px; border: 1px solid #7c3aed; background: white; color: #7c3aed; border-radius: 4px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 500; }
+    button:hover { background: #f3eaff; }
+    button.primary { background: #7c3aed; color: white; }
+    button.primary:hover { background: #6928d6; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .result { margin-top: 8px; padding: 8px 10px; border-radius: 4px; background: #f7f7f8; font-family: ui-monospace, monospace; font-size: 11px; white-space: pre-wrap; word-break: break-all; max-height: 240px; overflow: auto; }
+    .result.ok { background: #ecfdf5; border-left: 3px solid #16a34a; }
+    .result.err { background: #fef2f2; border-left: 3px solid #dc2626; }
+    .result:empty { display: none; }
+    .pill { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; margin-left: 6px; }
+    .pill.free { background: #dcfce7; color: #166534; }
+    .pill.cost { background: #fef3c7; color: #854d0e; }
+    code { background: #f0f0f0; padding: 1px 4px; border-radius: 2px; font-size: 11px; }
+  </style>
+</head>
+<body>
+
+<h1>Runway 测试控制台</h1>
+<p class="sub">按 1 → 2 → 3 → 4 顺序跑。每步都会显示后台真实响应。</p>
+
+<!-- ━━━━━━━━━━ Step 1: 凭证 ━━━━━━━━━━ -->
+<div class="card">
+  <h2><span class="step">1</span> 注入凭证 <span class="pill free">免费</span></h2>
+  <p class="hint">
+    在另一个标签页打开 <code>runwayml.com</code>，已登录状态下：
+    <br>① F12 → Network 面板，刷新一下页面 → 找任一 <code>api.runwayml.com</code> 的 GET 请求
+    <br>② Headers → 复制 <code>Authorization</code> 里 <code>Bearer </code> 后面那串（这是 JWT）
+    <br>③ 在响应里找 <code>asTeamId=</code> 后面的数字（teamId）
+    <br>④ 找一个 POST <code>/v1/tasks</code> 的 Request Payload，里面的 <code>assetGroupId</code> UUID
+  </p>
+  <div class="row"><label>JWT</label><textarea id="jwt" placeholder="eyJhbGciOiJIUzI1NiIs..."></textarea></div>
+  <div class="row"><label>Team ID</label><input id="teamId" type="text" placeholder="例如 2139480"></div>
+  <div class="row"><label>Asset Group ID</label><input id="assetGroupId" type="text" placeholder="例如 2b0a2296-00b6-4937-8a4c-4a3727ee90eb"></div>
+  <div class="row"><label></label>
+    <button class="primary" id="injectCredsBtn">保存凭证到后台</button>
+    <button id="loadCredsBtn">读出当前凭证</button>
+    <button id="clearCredsBtn" style="color:#c00; border-color:#c00;">清空全部凭证</button>
+  </div>
+  <div id="r1" class="result"></div>
+</div>
+
+<!-- ━━━━━━━━━━ Step 2: 只读 API 验证凭证有效 ━━━━━━━━━━ -->
+<div class="card">
+  <h2><span class="step">2</span> 验证凭证（只读 API） <span class="pill free">免费</span></h2>
+  <p class="hint">这两个调用是只读的，不创建任何东西。如果都成功，说明 JWT + teamId 都对。</p>
+  <div class="row"><label></label>
+    <button id="canStartBtn">canStart（队列容量）</button>
+    <button id="estimateBtn">estimateCost（5秒视频估价）</button>
+  </div>
+  <div id="r2" class="result"></div>
+</div>
+
+<!-- ━━━━━━━━━━ Step 3: 上传链测试（不创建任务） ━━━━━━━━━━ -->
+<div class="card">
+  <h2><span class="step">3</span> 上传链测试（不提交任务） <span class="pill free">免费</span></h2>
+  <p class="hint">
+    用 1×1 像素的透明 PNG 跑完整 4 步上传链：申请上传 → S3 PUT → complete → 注册 dataset。
+    <br>这一步是最容易出 bug 的环节（S3 签名、preview slot、ETag 解析），但不花钱。
+    <br>成功的标志：返回一个 <code>assetId</code>。
+  </p>
+  <div class="row"><label></label>
+    <button id="uploadBtn">跑上传链</button>
+  </div>
+  <div id="r3" class="result"></div>
+</div>
+
+<!-- ━━━━━━━━━━ Step 4: 真实提交 + 轮询 ━━━━━━━━━━ -->
+<div class="card">
+  <h2><span class="step">4</span> 真实提交一个任务 <span class="pill cost">耗 credits</span></h2>
+  <p class="hint">
+    提交一个 5 秒、480p、不带参考图的小任务。Seedance 2.0 探针实测 5 秒约 60 credits。
+    <br>提交后会自动轮询，每 5 秒查一次状态，直到完成或失败。
+  </p>
+  <div class="row"><label>Prompt</label><input id="testPrompt" type="text" value="A cat playing piano in the moonlight, cinematic"></div>
+  <div class="row"><label></label>
+    <button class="primary" id="submitBtn">提交</button>
+    <button id="pollBtn" disabled>手动查一次状态</button>
+    <button id="autoPollBtn" disabled>自动轮询直到完成</button>
+  </div>
+  <div id="r4" class="result"></div>
+</div>
+
+<!-- ━━━━━━━━━━ 任意调试 ━━━━━━━━━━ -->
+<div class="card">
+  <h2>调试日志</h2>
+  <p class="hint">所有调用的原始响应都打到这里。看到红色块时把内容贴给开发。</p>
+  <div id="log" class="result" style="min-height: 60px; max-height: 360px;"></div>
+</div>
+
+<script src="runway-debug.js"></script>
+<script type="text/template" id="legacy-inline-removed">
+// 内联代码已迁移至 runway-debug.js，因 MV3 CSP 禁止内联脚本
+let lastTaskId = null;
+let autoPollTimer = null;
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function show(divId, ok, payload) {
+  const el = document.getElementById(divId);
+  el.className = 'result ' + (ok ? 'ok' : 'err');
+  el.textContent = (ok ? '✓ ' : '✗ ') + (typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2));
+  appendLog(divId, ok, payload);
+}
+
+function appendLog(srcId, ok, payload) {
+  const log = document.getElementById('log');
+  const ts = new Date().toLocaleTimeString();
+  const line = document.createElement('div');
+  line.style.borderTop = log.children.length > 0 ? '1px solid #ddd' : 'none';
+  line.style.padding = '4px 0';
+  line.innerHTML = `<span style="color:#888">[${ts}] ${srcId}</span> ${ok ? '<span style="color:#16a34a">✓</span>' : '<span style="color:#dc2626">✗</span>'}\n${escapeHtml(typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2))}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+function send(msg) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(msg, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve({ success: false, error: chrome.runtime.lastError.message });
+      } else {
+        resolve(response);
+      }
+    });
+  });
+}
+
+async function injectCreds() {
+  const jwt = document.getElementById('jwt').value.trim();
+  const teamId = document.getElementById('teamId').value.trim();
+  const assetGroupId = document.getElementById('assetGroupId').value.trim();
+  if (!jwt || !teamId || !assetGroupId) {
+    show('r1', false, '三个字段都要填'); return;
+  }
+  const r1 = await send({ type: 'RUNWAY_SET_JWT', jwt });
+  const r2 = await send({ type: 'RUNWAY_SET_CONTEXT', context: { teamId: Number(teamId) || teamId, assetGroupId } });
+  if (r1.success && r2.success) {
+    show('r1', true, '凭证已保存到 chrome.storage.local。下次打开此页面会自动读出。');
+  } else {
+    show('r1', false, JSON.stringify({ jwt: r1, context: r2 }, null, 2));
+  }
+}
+
+async function loadCreds() {
+  const r1 = await send({ type: 'RUNWAY_GET_JWT' });
+  const r2 = await send({ type: 'RUNWAY_GET_CONTEXT' });
+  if (r1.hasJwt && r2.context) {
+    document.getElementById('jwt').value = '已存在（' + (r1.preview || '...') + '）— 重新粘贴会覆盖';
+    document.getElementById('teamId').value = r2.context.teamId || '';
+    document.getElementById('assetGroupId').value = r2.context.assetGroupId || '';
+    show('r1', true, '已读出现有凭证');
+  } else {
+    show('r1', false, '后台暂无凭证');
+  }
+}
+
+async function testCanStart() {
+  const r = await send({ type: 'RUNWAY_CAN_START' });
+  show('r2', r.success, r.success ? r.result : r);
+}
+
+async function testEstimate() {
+  const r = await send({ type: 'RUNWAY_ESTIMATE_COST', taskOptions: { model: 'seedance_2', duration: 5 } });
+  show('r2', r.success, r.success ? r.result : r);
+}
+
+async function testUpload() {
+  show('r3', true, '上传中（约需 5-10 秒）...');
+  const r = await send({ type: 'RUNWAY_TEST_UPLOAD' });
+  show('r3', r.success, r.success ? r.result : r);
+}
+
+async function testSubmit() {
+  const prompt = document.getElementById('testPrompt').value.trim();
+  if (!prompt) { show('r4', false, 'prompt 不能空'); return; }
+  show('r4', true, '提交中...');
+  const r = await send({
+    type: 'RUNWAY_TEST_SUBMIT',
+    task: { prompt, model: 'seedance_2', duration: 5, resolution: '480p', aspectRatio: '16:9' }
+  });
+  if (r.success) {
+    lastTaskId = r.result.taskId;
+    document.getElementById('pollBtn').disabled = false;
+    document.getElementById('autoPollBtn').disabled = false;
+  }
+  show('r4', r.success, r.success ? r.result : r);
+}
+
+async function pollLast() {
+  if (!lastTaskId) return;
+  const r = await send({ type: 'RUNWAY_POLL_TASK', taskId: lastTaskId });
+  show('r4', r.success, r.success ? r.result : r);
+  return r;
+}
+
+async function autoPoll() {
+  if (!lastTaskId) return;
+  if (autoPollTimer) { clearInterval(autoPollTimer); autoPollTimer = null; }
+  document.getElementById('autoPollBtn').textContent = '停止轮询';
+  document.getElementById('autoPollBtn').onclick = stopAutoPoll;
+  let count = 0;
+  autoPollTimer = setInterval(async () => {
+    count++;
+    const r = await pollLast();
+    if (r?.success && (r.result.status === 'completed' || r.result.status === 'failed' || r.result.status === 'cancelled')) {
+      stopAutoPoll();
+      appendLog('autoPoll', true, `已结束: ${r.result.status} (轮询了 ${count} 次)`);
+    } else if (count >= 60) {
+      stopAutoPoll();
+      appendLog('autoPoll', false, '60 次仍未结束，停止');
+    }
+  }, 5000);
+}
+
+function stopAutoPoll() {
+  if (autoPollTimer) { clearInterval(autoPollTimer); autoPollTimer = null; }
+  document.getElementById('autoPollBtn').textContent = '自动轮询直到完成';
+  document.getElementById('autoPollBtn').onclick = autoPoll;
+}
+
+// 自动加载已保存的凭证
+loadCreds();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,15 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Build output / 分发包不进 git，统一通过 GitHub Release 发布
+*.zip
+
+# Tests / scratch
+test-*.mjs
+*.log
+.vscode/
+.idea/
+
+# Node（如果以后引入构建工具）
+node_modules/

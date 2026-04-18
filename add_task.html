@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>添加任务</title>
+  <style>
+    :root {
+      --bg-color: #ffffff;
+      --text-main: #1a1a1a;
+      --text-muted: #666666;
+      --border-color: #efefef;
+      --primary-color: #7c3aed;
+    }
+
+    body {
+      padding: 0;
+      margin: 0;
+      background-color: var(--bg-color);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    .app-shell {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-color);
+      overflow: hidden;
+    }
+
+    .app-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0;
+    }
+
+    .app-header h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .main-container {
+      flex: 1;
+      padding: 12px 16px;
+      overflow-y: auto;
+    }
+
+    .form-section {
+      margin-bottom: 12px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #333;
+    }
+
+    .form-label-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .form-label-row .form-label {
+      margin-bottom: 0;
+      flex-shrink: 0;
+    }
+
+    .form-label-tip {
+      font-size: 11px;
+      font-weight: 400;
+      line-height: 1.5;
+      color: #dc2626;
+    }
+
+    .upload-section {
+      background: #fafafa;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    #taskImages {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .upload-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 56px; /* 匹配预览图高度 */
+      padding: 0 16px;
+      background: #fff;
+      border: 1px dashed var(--border-color); /* 改为虚线更有上传感 */
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      color: #666;
+      user-select: none;
+      transition: all 0.2s;
+    }
+
+    .upload-btn:hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+    }
+
+    .upload-btn:active {
+      background: #f3f4f6;
+    }
+
+    .image-preview-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .image-preview-item {
+      position: relative;
+      width: 56px;
+      height: 56px;
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+    }
+
+    .image-preview-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .image-index {
+      position: absolute;
+      top: 1px;
+      left: 1px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 0 3px;
+      border-radius: 2px;
+      font-size: 9px;
+    }
+
+    .image-preview-remove {
+      position: absolute;
+      top: 1px;
+      right: 1px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.9);
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+    }
+
+    .image-preview-insert {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(124, 58, 237, 0.85);
+      color: white;
+      border: none;
+      padding: 1px 0;
+      font-size: 9px;
+      cursor: pointer;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      font-size: 13px;
+      box-sizing: border-box;
+      background: #fff;
+    }
+
+    .textarea-compact {
+      min-height: 56px;
+    }
+
+    .form-field-hint {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .form-subfield .form-label {
+      margin-bottom: 6px;
+    }
+
+    select {
+      width: 100%;
+      padding: 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background: #fff;
+      font-size: 12px;
+    }
+
+    .sticky-footer {
+      background: #fff;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      padding: 6px 20px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #374151;
+    }
+
+    .btn-primary {
+      background: var(--primary-color);
+      color: white;
+    }
+    .batch-preview-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 6px;
+      padding: 5px 12px;
+      background: #f5f3ff;
+      border: 1px solid #ddd6fe;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #7c3aed;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .batch-preview-btn:hover {
+      background: #ede9fe;
+    }
+
+    /* 批量预览 Modal */
+    .batch-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 9999;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px 16px;
+      box-sizing: border-box;
+    }
+
+    .batch-modal-overlay.hidden {
+      display: none;
+    }
+
+    .batch-modal {
+      background: #fff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 560px;
+      max-height: calc(100vh - 48px);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    }
+
+    .batch-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid #efefef;
+      flex-shrink: 0;
+    }
+
+    .batch-modal-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    .batch-modal-close {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid #efefef;
+      background: #f9fafb;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+    }
+
+    .batch-modal-close:hover {
+      background: #f3f4f6;
+    }
+
+    .batch-modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .batch-task-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .batch-task-card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .batch-task-index {
+      background: #7c3aed;
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+
+    .batch-task-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-left: auto;
+    }
+
+    .batch-task-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: #f3f4f6;
+      color: #4b5563;
+    }
+
+    .batch-task-chip.warning {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .batch-task-thumbs {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .batch-task-thumbs img {
+      width: 36px;
+      height: 36px;
+      object-fit: cover;
+      border-radius: 4px;
+      border: 1px solid #e5e7eb;
+    }
+
+    .batch-task-prompt {
+      font-size: 12px;
+      color: #374151;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="app-header">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <h1 id="modalTitle">添加任务</h1>
+        <select id="taskPlatform" style="font-size:12px; padding:4px 8px; border:1px solid var(--border-color); border-radius:6px; background:#fff; cursor:pointer;">
+          <option value="jimeng" selected>即梦</option>
+          <option value="runway">Runway</option>
+        </select>
+      </div>
+    </div>
+    <main class="main-container">
+      <div class="form-section">
+        <div class="form-label-row">
+          <label class="form-label">上传图片</label>
+          <span class="form-label-tip" data-platform-only="jimeng">请先验证素材是否有效，否则提交时容易频繁失败</span>
+          <span class="form-label-tip" data-platform-only="runway" hidden>Runway 参考图最多 15 张，每张 ≤ 50MB</span>
+        </div>
+        <div class="upload-section">
+          <input type="file" id="taskImages" accept="image/*" multiple>
+          <div id="imagePreviewList" class="image-preview-list"></div>
+          <label for="taskImages" id="selectImagesBtn" class="upload-btn">+ 选择图片</label>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <label class="form-label">全局提示词</label>
+        <textarea id="globalPrompt" class="textarea-compact" placeholder="可选：会拼接到每一个任务中，适合放视觉风格、技术参数、光影、角色设定等等通用信息"></textarea>
+        <div class="form-field-hint">全局提示词会自动拼接到每一条任务中，适合统一视觉风格、技术参数、光影、角色设定等通用信息。</div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-grid">
+          <div class="form-subfield">
+            <label class="form-label">全局拼接方式</label>
+            <select id="taskComposeMode">
+              <option value="prepend" selected>全局在前</option>
+              <option value="append">全局在后</option>
+            </select>
+          </div>
+          <div class="form-subfield">
+            <label class="form-label">多任务分割方式</label>
+            <select id="taskSplitMode">
+              <option value="line" selected>逐行分割</option>
+              <option value="block">空行分割</option>
+              <option value="shot">镜头序号分割</option>
+            </select>
+            <div id="taskSplitModeHint" class="form-field-hint">逐行分割会把每一条非空行视为一个任务。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <label class="form-label">提示词 (Prompt)
+          <span id="batchTaskCount" style="font-weight:400;color:#7c3aed;margin-left:8px;"></span>
+        </label>
+        <textarea id="taskPrompt" placeholder="单个任务：直接输入任务提示词&#10;多个任务：按右侧分割方式拆分&#10;自动时长会识别每条里的第一组 x秒，支持 |4秒 或 ｜4秒"></textarea>
+        <div id="batchPreviewTrigger" style="display:none;">
+          <button type="button" class="batch-preview-btn" id="openBatchPreviewBtn">预览批量任务</button>
+        </div>
+      </div>
+
+      <!-- 即梦专属任务配置 -->
+      <div class="form-section" data-platform-fields="jimeng">
+        <label class="form-label">任务配置</label>
+        <div class="form-grid">
+          <select id="taskModel">
+            <option value="seedance_2_fast">Seedance 2.0 Fast</option>
+            <option value="seedance_2">Seedance 2.0</option>
+          </select>
+          <select id="taskReferenceMode">
+            <option value="all_reference">全能参考模式</option>
+            <option value="first_last_frames">首尾帧模式</option>
+          </select>
+          <select id="taskAspectRatio">
+            <option value="1:1">1:1比例</option>
+            <option value="4:3">4:3比例</option>
+            <option value="3:4">3:4比例</option>
+            <option value="16:9">16:9宽屏</option>
+            <option value="9:16" selected>9:16竖屏</option>
+          </select>
+          <select id="taskDuration">
+            <option value="auto" selected>自动时长（按提示词识别）</option>
+            <option value="4">4 秒时长</option>
+            <option value="5">5 秒</option>
+            <option value="6">6 秒</option>
+            <option value="7">7 秒</option>
+            <option value="8">8 秒</option>
+            <option value="9">9 秒</option>
+            <option value="10">10 秒</option>
+            <option value="11">11 秒</option>
+            <option value="12">12 秒</option>
+            <option value="13">13 秒</option>
+            <option value="14">14 秒</option>
+            <option value="15">15 秒</option>
+          </select>
+        </div>
+        <div id="taskDurationHint" class="form-field-hint">手动时长会统一应用到所有任务。</div>
+      </div>
+
+      <!-- Runway 专属任务配置 -->
+      <div class="form-section" data-platform-fields="runway" hidden>
+        <label class="form-label">任务配置</label>
+        <div class="form-grid">
+          <select id="runwayModel">
+            <option value="seedance_2" selected>Seedance 2.0</option>
+            <option value="gen4">Gen-4</option>
+          </select>
+          <select id="runwayResolution">
+            <option value="480p" selected>480p（最便宜）</option>
+            <option value="720p">720p</option>
+            <option value="1080p">1080p</option>
+          </select>
+          <select id="runwayAspectRatio">
+            <option value="16:9" selected>16:9 横屏</option>
+            <option value="9:16">9:16 竖屏</option>
+            <option value="1:1">1:1</option>
+            <option value="4:3">4:3</option>
+            <option value="3:4">3:4</option>
+          </select>
+          <select id="runwayDuration">
+            <option value="5" selected>5 秒</option>
+            <option value="10">10 秒</option>
+            <option value="15">15 秒</option>
+          </select>
+        </div>
+        <div class="form-grid" style="margin-top:8px;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
+            <input type="checkbox" id="runwayGenerateAudio" checked> 生成配音
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
+            <input type="checkbox" id="runwayExploreMode" checked> Explore Mode（更便宜）
+          </label>
+        </div>
+        <div class="form-field-hint">Runway 任务在后台直接调 API 提交，不需要打开 Runway 页面。请先在设置中粘贴 JWT 和 teamId。</div>
+      </div>
+    </main>
+
+    <footer class="sticky-footer">
+      <button id="cancelTaskBtn" class="btn btn-secondary">取消</button>
+      <button id="saveTaskBtn" class="btn btn-primary">添加任务</button>
+    </footer>
+  </div>
+
+  <!-- 批量任务预览 Modal -->
+  <div class="batch-modal-overlay hidden" id="batchModalOverlay">
+    <div class="batch-modal">
+      <div class="batch-modal-header">
+        <span class="batch-modal-title" id="batchModalTitle">批量任务预览</span>
+        <button class="batch-modal-close" id="closeBatchModalBtn">&times;</button>
+      </div>
+      <div class="batch-modal-body" id="batchModalBody"></div>
+    </div>
+  </div>
+
+  <script src="add_task.js" type="module"></script>
+</body>
+</html>

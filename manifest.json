@@ -1,0 +1,105 @@
+{
+  "manifest_version": 3,
+  "name": "ShopLoop AI 助手",
+  "version": "1.0.8",
+  "description": "ShopLoop AI · 多平台 AI 视频批量生成助手（即梦 + Runway 双平台挂机）",
+  "icons": {
+    "16": "assets/icon-16.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  },
+  "permissions": [
+    "notifications",
+    "storage",
+    "unlimitedStorage",
+    "alarms",
+    "tabs",
+    "offscreen",
+    "sidePanel",
+    "webRequest"
+  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "host_permissions": [
+    "https://jimeng.jianying.com/*",
+    "https://runwayml.com/*",
+    "https://*.runwayml.com/*",
+    "https://*.runwayml.cloud/*",
+    "https://runway-datasets.s3.us-east-1.amazonaws.com/*",
+    "https://*.cloudfront.net/*",
+    "https://pika.art/*",
+    "https://app.genmo.ai/*",
+    "https://imagex.bytedanceapi.com/*",
+    "https://*.bytedanceapi.com/*",
+    "https://imagex.volcengineapi.com/*",
+    "https://*.volcengineapi.com/*",
+    "https://tos-lf-x.snssdk.com/*",
+    "https://*.snssdk.com/*",
+    "https://*.byteimg.com/*",
+    "https://*.volces.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://jimeng.jianying.com/*",
+        "https://runwayml.com/*",
+        "https://pika.art/*",
+        "https://app.genmo.ai/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://runwayml.com/*",
+        "https://*.runwayml.com/*"
+      ],
+      "js": [
+        "platforms/runway/page-harvester.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "page-bridge.js",
+        "add_task.html",
+        "add_task.js",
+        "image-store.js",
+        "runway-debug.html"
+      ],
+      "matches": [
+        "https://jimeng.jianying.com/*",
+        "https://runwayml.com/*",
+        "https://pika.art/*",
+        "https://app.genmo.ai/*"
+      ]
+    },
+    {
+      "resources": [
+        "platforms/runway/page-harvester-inject.js"
+      ],
+      "matches": [
+        "https://runwayml.com/*",
+        "https://*.runwayml.com/*"
+      ]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "assets/icon-16.png",
+      "48": "assets/icon-48.png",
+      "128": "assets/icon-128.png"
+    }
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsnC/wGPp6vUIwRMM3HMY/7+p8wUCe3/oMwVu4LQQURqMsRIjfayJw3ZudBeHyu7Y6DfhdJbxRdsmUDcjR+o/LmLHneHmTk06tRACp+9yvl8gaaAEtoT9KpR+KmevD4KlAmWeGr1aKtpRvrLnlJtf9OwPDrGbr+jx27mL1DSGZvJTuGAsj+mYsa5a5W+exMc/qefsoccrG4EtFpwKFwPgiR1PhNhbNTn9ej28f+DWuWSg4mwGLVfN0EbWMVBAnjuxULlGVnKfjlEEFMFDU34beoyOTTJXRfMRRPYjExX6GGFX2xPZ1Jfu2JFrNjDB3AfLoyLMyBFQEl9jFYHKAIxcFQIDAQAB"
+}

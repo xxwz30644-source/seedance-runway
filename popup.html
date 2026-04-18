@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShopLoop AI 助手</title>
+  <link rel="stylesheet" href="styles/popup.css">
+  <link rel="stylesheet" href="styles/batch.css">
+</head>
+<body>
+  <div class="header task-center-header">
+    <div class="header-main">
+      <div class="header-top">
+        <div>
+        <h3>ShopLoop 任务中心</h3>
+        <p class="subtitle">统一查看提交队列、排队进度与页面捕获任务</p>
+        </div>
+        <div class="header-status-panel" id="headerStatusPanel">
+          <div class="header-status-row">
+            <span class="header-status-label">最大队列数</span>
+            <strong id="maxQueueCountText">-</strong>
+          </div>
+          <div class="header-status-row">
+            <span class="header-status-label">预计下次提交</span>
+            <strong id="nextSubmitTimeText">-</strong>
+          </div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="openSidePanelBtn" class="header-action" title="打开主控台（侧边栏）" style="background:#7c3aed;color:white;font-size:11px;padding:0 8px;width:auto;gap:4px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+          主控台
+        </button>
+        <button id="addTaskBtn" class="header-action primary" title="添加任务">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button id="batchToggleBtn" class="header-action primary" title="开始提交" disabled>
+          <span id="batchToggleIcon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"></path></svg>
+          </span>
+        </button>
+        <button id="refreshBtn" class="header-action" title="刷新任务">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        </button>
+        <button id="settingsBtn" class="header-action" title="设置">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="task-center-body">
+    <div id="settingsPanel" class="settings-panel settings-panel-hidden">
+      <label class="setting-toggle task-center-toggle" for="autoRefreshToggle">
+        <div>
+          <div class="setting-title">自动恢复卡死页面</div>
+          <div class="setting-hint">30 分钟无心跳时尝试刷新并弹窗提醒</div>
+        </div>
+        <input type="checkbox" id="autoRefreshToggle">
+      </label>
+    </div>
+
+    <div class="task-center-list" id="taskCenterList">
+      <div class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        <p>暂无任务</p>
+        <p class="hint">点击“添加任务”创建队列，或直接在支持的平台手动提交以自动捕获任务</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>
