@@ -1,64 +1,84 @@
-# Seedance Runway · 多平台 AI 视频批量生成助手
+<div align="center">
+  <img src="docs/screenshots/00-logo.png" alt="logo" width="96"/>
 
-> Chrome 浏览器扩展，支持**即梦（Jimeng）+ Runway**双平台批量任务生成、自动挂机、寄生轮询、风控加固。
-> 团队内部工具，开源免费 — **如发现有人付费售卖请立即退款，并联系下方原作者补充原版本**。
+  <h1>Seedance Runway</h1>
 
-![version](https://img.shields.io/badge/version-1.0.8-blue) ![manifest](https://img.shields.io/badge/manifest-v3-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green)
+  <p>多平台 AI 视频批量生成助手 · 即梦 + Runway 双平台挂机 · MV3 Chrome 扩展</p>
+
+  <p>
+    <img src="https://img.shields.io/badge/version-1.0.8-blue" alt="version"/>
+    <img src="https://img.shields.io/badge/manifest-v3-brightgreen" alt="manifest"/>
+    <img src="https://img.shields.io/badge/license-MIT-green" alt="license"/>
+  </p>
+</div>
 
 ---
 
-## ✨ 核心特性
+## 截图
 
-- **双平台批量调度**：即梦 3 并发 + Runway 2 并发同时跑，互不阻塞
-- **挂机模式**：开启后新建任务自动派发，到上限排队，完成自动续派
-- **Runway 寄生轮询**：用户开着 Runway 页时，后台请求量近乎归零（白嫖页面自身的 GET）
-- **反检测加固**：自动注入官方 Web 端指纹头（X-Runway-Client-Id / Source-Application / Version / Workspace），轮询间隔 ±25% 抖动，提交间随机 3-8s
-- **每日 80 条硬上限**：Runway 单日累计提交达 80 条自动停止派发，规避账号风控
-- **凭证自动抓取**：用 chrome.webRequest 监听 Runway 域，JWT / teamId / assetGroupId / fingerprint 全部自动落库，无需手填
-- **任务持久化**：所有任务、进度、结果存 chrome.storage.local，关浏览器再开继续
-- **侧边栏主控台**：暗紫黑配色，JetBrains Mono 字体，Operations Terminal 视觉
+| 任务表单 | 主控台底部 |
+|---|---|
+| <img src="docs/screenshots/01-add-task.png" width="380"/> | <img src="docs/screenshots/02-credits-old.png" width="320"/> |
+| 多平台表单切换、参考图最多 15 张 | 开源声明 + 风险提示 + 更新日志（v1.0.7+ 已升级三色卡片） |
 
-## 📦 安装
+> 完整截图集仍在补充。装好后侧边栏的 Operations Terminal 视觉效果建议自己跑一次看。
 
-由于未上架 Chrome 应用商店，需要开发者模式手动加载：
+---
+
+## 核心特性
+
+- 双平台批量调度：即梦 3 并发 + Runway 2 并发同时跑，互不阻塞
+- 挂机模式：开启后新建任务自动派发，到上限排队，完成自动续派
+- Runway 寄生轮询：用户开着 Runway 页时，后台请求量近乎归零（白嫖页面自身的 GET）
+- 反检测加固：自动注入官方 Web 端指纹头（X-Runway-Client-Id / Source-Application / Version / Workspace），轮询间隔 ±25% 抖动，提交间随机 3-8s
+- 每日 80 条硬上限：Runway 单日累计提交达 80 条自动停止派发，规避账号风控
+- 凭证自动抓取：用 chrome.webRequest 监听 Runway 域，JWT / teamId / assetGroupId / fingerprint 全部自动落库，无需手填
+- 任务持久化：所有任务、进度、结果存 chrome.storage.local，关浏览器再开继续
+- 侧边栏主控台：暗紫黑配色，JetBrains Mono 字体
+
+## 安装
+
+未上架 Chrome 应用商店，需要开发者模式手动加载：
 
 1. 下载最新 [Releases](../../releases) 里的 `ShopLoopAI-vX.X.X.zip` 并**解压**
 2. 浏览器打开 `chrome://extensions/`
-3. 右上角打开「**开发者模式**」
-4. 点「**加载已解压的扩展程序**」，选刚解压的目录
+3. 右上角打开「开发者模式」
+4. 点「加载已解压的扩展程序」，选刚解压的目录
 5. 钉到工具栏 → 点扩展图标打开 popup，或点「打开主控台」进入侧边栏
 
-> Chrome 启动时会显示「正在停用开发者模式扩展程序」黄条提示，**正常现象**，点 X 关掉即可继续使用。
+> Chrome 启动时会显示「正在停用开发者模式扩展程序」黄条提示，正常现象，点 X 关掉即可继续使用。
 
-## 🚀 使用
+## 使用
 
-### 即梦路径
+**即梦路径**
+
 1. 登录 https://jimeng.jianying.com/
 2. 点扩展「+ 新建任务」，平台选「即梦」，填提示词、选模型、上传参考图
 3. 主控台开「挂机模式」，任务自动跑
 
-### Runway 路径
+**Runway 路径**
+
 1. 登录 https://app.runwayml.com/，让页面跑一会儿（插件自动抓凭证）
 2. 点扩展「+ 新建任务」，平台选「Runway」，填提示词、选模型 / 时长 / 分辨率 / 参考图
 3. 主控台开「挂机模式」即可
-4. **建议保持 Runway 标签页打开** —— 启用寄生模式可大幅减少后台请求量
+4. 建议保持 Runway 标签页打开 —— 启用寄生模式可大幅减少后台请求量
 
-## ⚠️ 风险须知
+## 风险须知
 
-本插件本质上是**对官方平台的脚本化调用**，严格按 ToS 字面解释属于违规。已做缓解：
+本插件本质上是对官方平台的脚本化调用，严格按 ToS 字面解释属于违规。已做缓解：
 
-- ✅ 自动注入 Runway 官方 Web 端指纹头
-- ✅ 轮询 / 提交间隔随机抖动
-- ✅ 寄生页面轮询，后台请求量大幅降低
-- ✅ 单日 80 条硬上限
+- 自动注入 Runway 官方 Web 端指纹头
+- 轮询 / 提交间隔随机抖动
+- 寄生页面轮询，后台请求量大幅降低
+- 单日 80 条硬上限
 
-**仍无法消除的风险**：
+仍无法消除的风险：
 
 - 请求 Origin 始终是 `chrome-extension://...`，浏览器层面无法伪装
 - 多并发持续挂机的产能仍显著高于真人
 - Credits 异常消耗本身就会触发风控复查
 
-**强烈建议**：
+强烈建议：
 
 - 主账号 / 挂机账号分离
 - 分散时段使用，避免 24h 不间断
@@ -67,7 +87,7 @@
 
 > 本插件仅供学习与团队内部使用，由此产生的任何账号风险由使用者自行承担。
 
-## 🏗️ 架构
+## 架构
 
 ```
 ShopLoopAI/
@@ -93,7 +113,7 @@ ShopLoopAI/
 └── styles/                    # 共享样式
 ```
 
-## 🛠️ 二次开发
+## 二次开发
 
 ```bash
 git clone https://github.com/yejunhao159/seedance-runway.git
@@ -103,30 +123,51 @@ cd seedance-runway
 
 新增第三个平台 = 在 `platforms/` 下新建目录，实现 Platform 契约（monitor / submitter / form-schema / config），到 `registry.js` 注册——核心调度器无需任何改动。
 
-## 📒 更新日志
+## 更新日志
 
 详见侧边栏底部「更新日志」面板，或 [GitHub Releases](../../releases)。
 
 ---
 
-## 🌟 多参宗 · 开源项目
+## 多参宗 · 开源项目
 
-本仓库由「**多参宗**」团队开源维护，核心作者：
+本仓库由「多参宗」团队开源维护，核心作者：
 
 | 作者 | 微信 |
 |---|---|
-| **椰汁** | `yyy246jhh888` |
-| **望中** | `RM1132623` |
+| 椰汁 | `yyy246jhh888` |
+| 望中 | `RM1132623` |
 
-商业版本「**ShopLoop AI**」提供以下增强能力（联系上方微信咨询）：
-- 🔥 多账号统一调度（自动负载均衡）
-- 🔥 跨平台任务模板库
-- 🔥 团队协作 & 任务结果云端归档
-- 🔥 更激进的反检测策略（住宅 IP 池 / UA 池 / 行为模拟）
-- 🔥 7×24 私有部署 & 售后支持
+## 团队商业产品矩阵
 
-> ⚠️ **本仓库为开源免费版，如发现被付费售卖请立即申请退款，并通过上方微信联系原作者获取原版本。**
+<img src="docs/screenshots/03-business.png" width="100%" alt="商业版本"/>
 
-## 📄 License
+本插件解决「视频素材批量生成」这一环；如果你的需求是**整条小红书 AI 运营链路**（选题 → 素材 → 发布 → 数据复盘），欢迎了解我们另外两个商业产品：
+
+### ShopAgent · 小红书 AI 运营研究平台
+
+桌面端工具（React 18 + Tauri 2），面向小红书商家的 **KFS 方法论**（关键词 · 爆款 · 供给侧）研究助手：
+
+- 关键词矩阵研究 — 一键拉竞品 / 类目 / 长尾词数据
+- 爆款逆向拆解 — 自动归类标题 / 封面 / 互动结构
+- 供给侧分析 — 找内容空白机会
+- 内置 AI Agent — 借用已登录浏览器采集小红书数据 → SQLite 本地缓存 → AI 分析报告
+
+### ShopLoop AI · 小红书全自动运营 · 数据中台
+
+官网：[**shoploopai.com**](https://shoploopai.com)
+
+- 多账号矩阵全自动运营 — 选题、文案、配图、视频、发布、互动一条龙
+- 数据中台 — 跨账号、跨平台数据归一统一看板，沉淀爆款规律
+- 企业级风控 — 住宅 IP 池 / UA 指纹池 / 行为模拟 / 多账号隔离
+- 私有化 / SaaS 双形态，7×24 售后支持
+
+商务咨询请加上方两位作者微信，备注「**Seedance Runway 用户**」。
+
+---
+
+> 本仓库为开源免费版。如发现被付费售卖请立即申请退款，并通过上方微信联系原作者获取原版本。
+
+## License
 
 MIT —— 商业使用、修改、再发布均可，但请保留 LICENSE 与作者署名。
