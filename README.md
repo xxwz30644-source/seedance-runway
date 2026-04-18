@@ -1,4 +1,8 @@
 <div align="center">
+  <img src="https://img.shields.io/badge/%E5%A4%9A%E5%8F%82%E5%AE%97-Community-7c3aed?style=for-the-badge" alt="多参宗 Community"/>
+
+  <br/><br/>
+
   <img src="docs/screenshots/00-logo.png" alt="logo" width="96"/>
 
   <h1>Seedance Runway</h1>
@@ -10,6 +14,8 @@
     <img src="https://img.shields.io/badge/manifest-v3-brightgreen" alt="manifest"/>
     <img src="https://img.shields.io/badge/license-MIT-green" alt="license"/>
   </p>
+
+  <p><sub>由 <b>椰汁</b> 开发，<b>多参宗</b> 社区推荐</sub></p>
 </div>
 
 ---
