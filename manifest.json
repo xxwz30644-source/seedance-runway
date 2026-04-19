@@ -70,6 +70,7 @@
         "add_task.html",
         "add_task.js",
         "image-store.js",
+        "zip-utils.js",
         "runway-debug.html"
       ],
       "matches": [

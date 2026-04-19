@@ -460,6 +460,71 @@
       line-height: 1;
     }
 
+    /* ─── IMPORT / EXPORT ──────────────────────────────────── */
+
+    .actions-io {
+      padding: 0 16px 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+
+    .export-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(6, 8, 15, 0.75);
+      align-items: center;
+      justify-content: center;
+    }
+    .export-overlay.show { display: flex; }
+    .export-menu {
+      background: var(--surface-2);
+      border: 1px solid var(--border-bright);
+      border-radius: 4px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 240px;
+    }
+    .export-menu-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .task-card .export-check {
+      display: none;
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+      cursor: pointer;
+      z-index: 10;
+    }
+    body.export-select-mode .task-card .export-check { display: block; }
+
+    .export-bar {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 210;
+      background: var(--surface-2);
+      border-top: 1px solid var(--border-bright);
+      padding: 10px 16px;
+      gap: 6px;
+      justify-content: center;
+    }
+    body.export-select-mode .export-bar { display: flex; }
+
     /* ─── FILTERS ─────────────────────────────────────────────── */
 
     .filters {
@@ -1106,6 +1171,25 @@
   <button class="btn" id="startBtn"><span class="glyph">▶</span> 启动</button>
   <button class="btn" id="pauseBtn"><span class="glyph">⏸</span> 暂停</button>
   <button class="btn" id="clearBtn">清空</button>
+</div>
+<div class="actions-io">
+  <button class="btn" id="exportBtn"><span class="glyph">↑</span> 导出</button>
+  <button class="btn" id="importBtn"><span class="glyph">↓</span> 导入</button>
+</div>
+<input type="file" id="importFileInput" accept=".zip" style="display:none">
+
+<div class="export-overlay" id="exportOverlay">
+  <div class="export-menu">
+    <div class="export-menu-title">导出任务</div>
+    <button class="btn" id="exportAllBtn">导出全部（当前筛选）</button>
+    <button class="btn" id="exportSelectBtn">逐个勾选导出</button>
+    <button class="btn" id="exportCancelBtn">取消</button>
+  </div>
+</div>
+
+<div class="export-bar" id="exportBar">
+  <button class="btn primary" id="exportSelectedBtn"><span class="glyph">↑</span> 导出选中</button>
+  <button class="btn" id="exportBarCancel">取消</button>
 </div>
 
 <!-- ─── 筛选 ─── -->

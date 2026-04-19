@@ -12,13 +12,17 @@
  *   - chrome.storage.onChanged 监听 batchTasks，立即刷新
  */
 
+import { getImageRecord, putImageRecord } from './image-store.js';
+import { createZip, parseZip } from './zip-utils.js';
+
 const STATE = {
   filterPlatform: 'all',
   filterStatusList: 'all',
   tasks: [],
   health: { jimeng: { running: 0, limit: 3 }, runway: { running: 0, limit: 2 } },
   autoRun: false,
-  pollTimer: null
+  pollTimer: null,
+  exportSelectMode: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -202,7 +206,8 @@ function renderTaskCard(task) {
   ].filter(Boolean).join(' ');
 
   return `
-    <div class="${cardClasses}">
+    <div class="${cardClasses}" data-task-id-card="${task.id}">
+      <input type="checkbox" class="export-check" data-export-id="${task.id}">
       <div class="task-thumb">${thumbHtml}</div>
       <div class="task-body">
         <div class="task-row1">
@@ -335,6 +340,41 @@ function bindEvents() {
       loadAll();
     }
   });
+
+  // ─── 导入 / 导出 ─────────────────────────────────────────
+  $('exportBtn').addEventListener('click', () => {
+    $('exportOverlay').classList.add('show');
+  });
+  $('exportCancelBtn').addEventListener('click', () => {
+    $('exportOverlay').classList.remove('show');
+  });
+  $('exportOverlay').addEventListener('click', (e) => {
+    if (e.target === $('exportOverlay')) $('exportOverlay').classList.remove('show');
+  });
+  $('exportAllBtn').addEventListener('click', () => {
+    $('exportOverlay').classList.remove('show');
+    exportFiltered();
+  });
+  $('exportSelectBtn').addEventListener('click', () => {
+    $('exportOverlay').classList.remove('show');
+    enterExportSelectMode();
+  });
+  $('exportSelectedBtn').addEventListener('click', () => {
+    const ids = [...document.querySelectorAll('.export-check:checked')].map(cb => cb.dataset.exportId);
+    if (ids.length === 0) { toast('请至少勾选一个任务'); return; }
+    exitExportSelectMode();
+    exportByIds(ids);
+  });
+  $('exportBarCancel').addEventListener('click', exitExportSelectMode);
+
+  $('importBtn').addEventListener('click', () => {
+    $('importFileInput').value = '';
+    $('importFileInput').click();
+  });
+  $('importFileInput').addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) importFromZip(file);
+  });
 }
 
 // ─── 启动 ────────────────────────────────────────────────
@@ -342,6 +382,145 @@ function bindEvents() {
 bindEvents();
 loadAll();
 startPolling();
+
+// ─── 导出/导入逻辑 ─────────────────────────────────────────
+
+function enterExportSelectMode() {
+  STATE.exportSelectMode = true;
+  document.body.classList.add('export-select-mode');
+}
+
+function exitExportSelectMode() {
+  STATE.exportSelectMode = false;
+  document.body.classList.remove('export-select-mode');
+  document.querySelectorAll('.export-check').forEach(cb => cb.checked = false);
+}
+
+function getFilteredTasks() {
+  return STATE.tasks.filter((t) => {
+    const p = t.platform || 'jimeng';
+    if (STATE.filterPlatform !== 'all' && p !== STATE.filterPlatform) return false;
+    if (STATE.filterStatusList !== 'all') {
+      const allowed = STATE.filterStatusList.split(',');
+      if (!allowed.includes(t.status)) return false;
+    }
+    return true;
+  });
+}
+
+function exportFiltered() {
+  const tasks = getFilteredTasks();
+  if (tasks.length === 0) { toast('当前筛选下没有任务'); return; }
+  exportByIds(tasks.map(t => t.id));
+}
+
+async function exportByIds(taskIds) {
+  try {
+    toast('正在打包…');
+    const idSet = new Set(taskIds);
+    const tasksToExport = STATE.tasks.filter(t => idSet.has(t.id));
+
+    const cleaned = tasksToExport.map(t => {
+      const c = { ...t };
+      c.status = 'pending';
+      c.error = null;
+      c.runwayTaskId = null;
+      c.historyRecordId = null;
+      c.videoUrl = null;
+      c.thumbnailUrl = null;
+      c.queueInfo = null;
+      return c;
+    });
+
+    const imageIds = new Set();
+    for (const t of cleaned) {
+      if (t.images) {
+        for (const img of t.images) {
+          if (img.imageId) imageIds.add(img.imageId);
+        }
+      }
+    }
+
+    const zipFiles = [];
+    zipFiles.push({
+      name: 'tasks.json',
+      data: new TextEncoder().encode(JSON.stringify(cleaned, null, 2)),
+    });
+
+    for (const imageId of imageIds) {
+      try {
+        const record = await getImageRecord(imageId);
+        if (record?.blob) {
+          const ab = await record.blob.arrayBuffer();
+          zipFiles.push({
+            name: `images/${imageId}.bin`,
+            data: new Uint8Array(ab),
+          });
+        }
+      } catch (e) {
+        console.warn('读取图片失败:', imageId, e);
+      }
+    }
+
+    const blob = createZip(zipFiles);
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shoploop-export-${ts}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`已导出 ${tasksToExport.length} 个任务`);
+  } catch (e) {
+    console.error('导出失败:', e);
+    toast('导出失败：' + (e.message || '未知错误'));
+  }
+}
+
+async function importFromZip(file) {
+  try {
+    toast('正在导入…');
+    const buffer = await file.arrayBuffer();
+    const entries = parseZip(buffer);
+
+    const tasksEntry = entries.find(e => e.name === 'tasks.json');
+    if (!tasksEntry) { toast('ZIP 中找不到 tasks.json'); return; }
+
+    const tasksJson = new TextDecoder().decode(tasksEntry.data);
+    const tasks = JSON.parse(tasksJson);
+    if (!Array.isArray(tasks) || tasks.length === 0) { toast('没有可导入的任务'); return; }
+
+    const imageEntries = entries.filter(e => e.name.startsWith('images/'));
+    for (const ie of imageEntries) {
+      const imageId = ie.name.replace('images/', '').replace('.bin', '');
+      if (!imageId) continue;
+      const blob = new Blob([ie.data]);
+      await putImageRecord({ id: imageId, blob });
+    }
+
+    let imported = 0;
+    for (const task of tasks) {
+      task.id = crypto.randomUUID();
+      task.status = 'pending';
+      task.error = null;
+      task.runwayTaskId = null;
+      task.historyRecordId = null;
+      task.videoUrl = null;
+      task.thumbnailUrl = null;
+      task.queueInfo = null;
+      task.createdAt = Date.now();
+
+      const r = await send({ type: 'ADD_BATCH_TASK', task });
+      if (r?.success) imported++;
+    }
+
+    await loadAll();
+    toast(`已导入 ${imported} 个任务`);
+  } catch (e) {
+    console.error('导入失败:', e);
+    toast('导入失败：' + (e.message || '未知错误'));
+  }
+}
 
 // ─── Footer 交互（避开 MV3 CSP 对内联 <script> 的禁用） ───
 
