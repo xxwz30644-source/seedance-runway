@@ -1639,6 +1639,7 @@ class BatchManager {
   async applyRunwayUpdate(runwayTaskId, update, source = 'poll') {
     const task = this.tasks.find(t => t.runwayTaskId === runwayTaskId);
     if (!task) return false;
+    if (['completed', 'failed', 'cancelled'].includes(task.status)) return false;
 
     task.queueInfo = update.estimatedTimeToStartSeconds != null
       ? { estimatedTimeToStartSeconds: update.estimatedTimeToStartSeconds, progress: update.progress }
