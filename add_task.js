@@ -1,4 +1,4 @@
-import { putImageRecord } from './image-store.js';
+import { putImageRecord, getImageRecord } from './image-store.js';
 
 let editTaskId = null;
 let duplicateTaskId = null;
@@ -50,6 +50,8 @@ function init() {
     if (titleEl) titleEl.textContent = '基于任务新建';
     if (saveBtn) saveBtn.textContent = '创建任务';
     loadTaskIntoForm(duplicateTaskId);
+  } else {
+    restoreFormCache();
   }
 
   const globalPrompt = document.getElementById('globalPrompt');
@@ -493,6 +495,7 @@ function saveTask() {
         if (editTaskId) break;
       }
       chrome.runtime.sendMessage({ type: 'TASK_ADDED_SUCCESSFULLY' });
+      saveFormCache(images);
       releaseAllPreviewResources();
       closeTaskWindow();
     })
@@ -800,4 +803,74 @@ function sendMessage(message) {
       resolve(response);
     });
   });
+}
+
+// ─── 表单缓存（全局提示词 + 参考图） ──────────────────────
+
+function saveFormCache(images) {
+  const globalPrompt = document.getElementById('globalPrompt').value;
+  const cache = {
+    globalPrompt,
+    images: (images || []).map(img => ({
+      fileName: img.fileName,
+      preview: img.preview,
+      imageId: img.imageId || null,
+      uri: img.uri,
+      width: img.width || null,
+      height: img.height || null,
+    })),
+  };
+  chrome.storage.local.set({ formCache: cache });
+}
+
+async function restoreFormCache() {
+  try {
+    const { formCache } = await chrome.storage.local.get('formCache');
+    if (!formCache) return;
+
+    if (formCache.globalPrompt) {
+      document.getElementById('globalPrompt').value = formCache.globalPrompt;
+    }
+
+    if (formCache.images?.length > 0) {
+      const previewList = document.getElementById('imagePreviewList');
+      const isFirstLastFrames = document.getElementById('taskReferenceMode').value === 'first_last_frames';
+
+      for (let i = 0; i < formCache.images.length; i++) {
+        const img = formCache.images[i];
+        // Verify the image still exists in IndexedDB
+        if (img.imageId) {
+          const record = await getImageRecord(img.imageId);
+          if (!record) continue;
+        }
+
+        selectedImages.push({
+          name: img.fileName,
+          preview: img.preview,
+          imageId: img.imageId || null,
+          uri: img.uri,
+          width: img.width || null,
+          height: img.height || null,
+          isExisting: true,
+        });
+
+        const item = document.createElement('div');
+        item.className = 'image-preview-item';
+        item.innerHTML = `
+          <img src="${img.preview}" alt="${escapeHtml(img.fileName)}">
+          <div class="image-index" style="display: ${isFirstLastFrames ? 'none' : 'block'}">{${selectedImages.length - 1}}</div>
+          <button class="image-preview-insert" style="display: ${isFirstLastFrames ? 'none' : 'inline-block'}">插入引用</button>
+          <button class="image-preview-remove">&times;</button>
+        `;
+        previewList.appendChild(item);
+        bindImagePreviewEvents(item, previewList);
+      }
+
+      updateTaskImagesHint();
+    }
+
+    updateBatchPreview();
+  } catch (e) {
+    console.warn('恢复表单缓存失败:', e);
+  }
 }
