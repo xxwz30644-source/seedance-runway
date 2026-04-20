@@ -375,6 +375,8 @@ function bindEvents() {
     const file = e.target.files?.[0];
     if (file) importFromZip(file);
   });
+
+  $('batchDownloadBtn').addEventListener('click', batchDownloadVideos);
 }
 
 // ─── 启动 ────────────────────────────────────────────────
@@ -519,6 +521,57 @@ async function importFromZip(file) {
   } catch (e) {
     console.error('导入失败:', e);
     toast('导入失败：' + (e.message || '未知错误'));
+  }
+}
+
+async function batchDownloadVideos() {
+  const completed = getFilteredTasks().filter(t => t.status === 'completed' && t.videoUrl);
+  if (completed.length === 0) {
+    toast('当前筛选下没有可下载的已完成任务');
+    return;
+  }
+
+  try {
+    toast(`正在下载 ${completed.length} 个视频…`);
+    const zipFiles = [];
+    let downloaded = 0;
+
+    for (const task of completed) {
+      try {
+        const resp = await fetch(task.videoUrl);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const ab = await resp.arrayBuffer();
+
+        const ext = task.videoUrl.match(/\.(mp4|webm|mov)/i)?.[1] || 'mp4';
+        const prompt = (task.promptText || 'video').slice(0, 40).replace(/[\\/:*?"<>|]/g, '_');
+        const name = `${String(downloaded + 1).padStart(2, '0')}_${prompt}.${ext}`;
+
+        zipFiles.push({ name, data: new Uint8Array(ab) });
+        downloaded++;
+        toast(`已下载 ${downloaded}/${completed.length}…`);
+      } catch (e) {
+        console.warn('下载视频失败:', task.videoUrl, e);
+      }
+    }
+
+    if (zipFiles.length === 0) {
+      toast('所有视频下载失败');
+      return;
+    }
+
+    toast('正在打包…');
+    const blob = createZip(zipFiles);
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shoploop-videos-${ts}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`已打包 ${zipFiles.length} 个视频`);
+  } catch (e) {
+    console.error('批量下载失败:', e);
+    toast('批量下载失败：' + (e.message || '未知错误'));
   }
 }
 
