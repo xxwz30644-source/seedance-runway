@@ -430,8 +430,8 @@
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
         <h1 id="modalTitle">添加任务</h1>
         <select id="taskPlatform" style="font-size:12px; padding:4px 8px; border:1px solid var(--border-color); border-radius:6px; background:#fff; cursor:pointer;">
-          <option value="jimeng" selected>即梦</option>
-          <option value="runway">Runway</option>
+          <option value="jimeng">即梦</option>
+          <option value="runway" selected>Runway</option>
         </select>
       </div>
     </div>
@@ -447,6 +447,12 @@
           <div id="imagePreviewList" class="image-preview-list"></div>
           <label for="taskImages" id="selectImagesBtn" class="upload-btn">+ 选择图片</label>
         </div>
+      </div>
+
+      <div class="form-section">
+        <label class="form-label">任务名称</label>
+        <input type="text" id="taskName" class="textarea-compact" style="height:auto; padding:8px 10px; resize:none;" placeholder="可选：为这批任务命名，方便识别和管理">
+        <div class="form-field-hint">批量任务会自动添加序号后缀（如：名称_01、名称_02）。下载视频时将使用此名称命名文件。</div>
       </div>
 
       <div class="form-section">
@@ -467,8 +473,8 @@
           <div class="form-subfield">
             <label class="form-label">多任务分割方式</label>
             <select id="taskSplitMode">
-              <option value="line" selected>逐行分割</option>
-              <option value="block">空行分割</option>
+              <option value="line">逐行分割</option>
+              <option value="block" selected>空行分割</option>
               <option value="shot">镜头序号分割</option>
             </select>
             <div id="taskSplitModeHint" class="form-field-hint">逐行分割会把每一条非空行视为一个任务。</div>
@@ -533,8 +539,8 @@
             <option value="gen4">Gen-4</option>
           </select>
           <select id="runwayResolution">
-            <option value="480p" selected>480p（最便宜）</option>
-            <option value="720p">720p</option>
+            <option value="480p">480p（最便宜）</option>
+            <option value="720p" selected>720p</option>
             <option value="1080p">1080p</option>
           </select>
           <select id="runwayAspectRatio">
@@ -545,9 +551,9 @@
             <option value="3:4">3:4</option>
           </select>
           <select id="runwayDuration">
-            <option value="5" selected>5 秒</option>
+            <option value="5">5 秒</option>
             <option value="10">10 秒</option>
-            <option value="15">15 秒</option>
+            <option value="15" selected>15 秒</option>
           </select>
         </div>
         <div class="form-grid" style="margin-top:8px;">

@@ -196,6 +196,7 @@ function renderTaskCard(task) {
     : '';
 
   const promptText = task.promptText || task.config?.prompt || '(无提示词)';
+  const taskName = task.name || '';
   const aspectRatio = task.config?.aspectRatio || '';
   const duration = task.config?.duration || task.config?.durationSeconds || '—';
 
@@ -216,6 +217,7 @@ function renderTaskCard(task) {
           <span class="task-meta-sep">·</span>
           <span>${duration}S</span>
         </div>
+        ${taskName ? `<div class="task-name" style="font-size:11px;font-weight:700;color:var(--accent-bright);margin-bottom:2px;letter-spacing:0.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(taskName)}</div>` : ''}
         <div class="task-prompt">${escapeHtml(promptText)}</div>
         <div class="task-status-row">
           <span class="status-badge status-${status}">${statusLabel(status)}</span>
@@ -543,8 +545,8 @@ async function batchDownloadVideos() {
         const ab = await resp.arrayBuffer();
 
         const ext = task.videoUrl.match(/\.(mp4|webm|mov)/i)?.[1] || 'mp4';
-        const prompt = (task.promptText || 'video').slice(0, 40).replace(/[\\/:*?"<>|]/g, '_');
-        const name = `${String(downloaded + 1).padStart(2, '0')}_${prompt}.${ext}`;
+        const label = (task.name || task.promptText || 'video').slice(0, 60).replace(/[\\/:*?"<>|]/g, '_');
+        const name = `${String(downloaded + 1).padStart(2, '0')}_${label}.${ext}`;
 
         zipFiles.push({ name, data: new Uint8Array(ab) });
         downloaded++;

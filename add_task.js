@@ -119,6 +119,7 @@ async function loadTaskIntoForm(taskId) {
     }
 
     const promptMeta = task.promptMeta || {};
+    document.getElementById('taskName').value = task.name || '';
     document.getElementById('globalPrompt').value = promptMeta.globalPromptText || '';
     document.getElementById('taskPrompt').value = promptMeta.localPromptText || task.promptText || '';
     document.getElementById('taskComposeMode').value = promptMeta.composeMode || 'prepend';
@@ -356,6 +357,7 @@ function validateFirstLastFrameImageRatios(images, config) {
 function saveTask() {
   const platformId = getCurrentPlatform();
   const globalPrompt = document.getElementById('globalPrompt').value.trim();
+  const taskName = document.getElementById('taskName').value.trim();
   const raw = document.getElementById('taskPrompt').value.trim();
   const composeMode = document.getElementById('taskComposeMode').value;
   const splitMode = document.getElementById('taskSplitMode').value;
@@ -473,6 +475,9 @@ function saveTask() {
 
         const taskPayload = {
           platform: platformId,
+          name: taskName
+            ? (drafts.length > 1 ? `${taskName}_${String(i + 1).padStart(2, '0')}` : taskName)
+            : '',
           promptText: draft.promptText,
           images,
           config: taskConfig,
@@ -809,8 +814,10 @@ function sendMessage(message) {
 
 function saveFormCache(images) {
   const globalPrompt = document.getElementById('globalPrompt').value;
+  const taskName = document.getElementById('taskName').value;
   const cache = {
     globalPrompt,
+    taskName,
     images: (images || []).map(img => ({
       fileName: img.fileName,
       preview: img.preview,
@@ -830,6 +837,9 @@ async function restoreFormCache() {
 
     if (formCache.globalPrompt) {
       document.getElementById('globalPrompt').value = formCache.globalPrompt;
+    }
+    if (formCache.taskName) {
+      document.getElementById('taskName').value = formCache.taskName;
     }
 
     if (formCache.images?.length > 0) {
