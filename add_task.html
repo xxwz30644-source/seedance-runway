@@ -450,15 +450,22 @@
       </div>
 
       <div class="form-section">
-        <label class="form-label">任务名称</label>
-        <input type="text" id="taskName" class="textarea-compact" style="height:auto; padding:8px 10px; resize:none;" placeholder="可选：为这批任务命名，方便识别和管理">
-        <div class="form-field-hint">批量任务会自动添加序号后缀（如：名称_01、名称_02）。下载视频时将使用此名称命名文件。</div>
+        <label class="form-label">任务名称（可选）</label>
+        <input type="text" id="taskName" class="textarea-compact" style="height:34px; padding:6px 10px;" placeholder="给这批任务起个名，方便批量管理和导出（多任务自动加 _01/_02）">
       </div>
 
       <div class="form-section">
         <label class="form-label">全局提示词</label>
         <textarea id="globalPrompt" class="textarea-compact" placeholder="可选：会拼接到每一个任务中，适合放视觉风格、技术参数、光影、角色设定等等通用信息"></textarea>
         <div class="form-field-hint">全局提示词会自动拼接到每一条任务中，适合统一视觉风格、技术参数、光影、角色设定等通用信息。</div>
+      </div>
+
+      <div class="form-section" id="moderationPanel" hidden>
+        <div class="form-label-row">
+          <label class="form-label">提交前预审结果</label>
+          <button type="button" id="moderationDismissBtn" style="font-size:11px; padding:2px 8px; border:1px solid var(--border-color); background:#fff; border-radius:4px; cursor:pointer;">我已了解，继续提交</button>
+        </div>
+        <div id="moderationResult" style="padding:10px 12px; background:#fff8e6; border:1px solid #f0c36d; border-radius:6px; font-size:12px; line-height:1.6; white-space:pre-wrap;"></div>
       </div>
 
       <div class="form-section">
@@ -513,7 +520,8 @@
           </select>
           <select id="taskDuration">
             <option value="auto" selected>自动时长（按提示词识别）</option>
-            <option value="4">4 秒时长</option>
+            <option value="3">3 秒</option>
+            <option value="4">4 秒</option>
             <option value="5">5 秒</option>
             <option value="6">6 秒</option>
             <option value="7">7 秒</option>
@@ -536,6 +544,7 @@
         <div class="form-grid">
           <select id="runwayModel">
             <option value="seedance_2" selected>Seedance 2.0</option>
+            <option value="gen4_turbo">Gen-4 Turbo（更快）</option>
             <option value="gen4">Gen-4</option>
           </select>
           <select id="runwayResolution">
@@ -551,6 +560,7 @@
             <option value="3:4">3:4</option>
           </select>
           <select id="runwayDuration">
+            <option value="3">3 秒</option>
             <option value="5">5 秒</option>
             <option value="10">10 秒</option>
             <option value="15" selected>15 秒</option>
@@ -561,14 +571,18 @@
             <input type="checkbox" id="runwayGenerateAudio" checked> 生成配音
           </label>
           <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
-            <input type="checkbox" id="runwayExploreMode" checked> Explore Mode（更便宜）
+            <input type="checkbox" id="runwayExploreMode"> Explore Mode（省 credits，排队慢 10-30 分钟）
           </label>
         </div>
-        <div class="form-field-hint">Runway 任务在后台直接调 API 提交，不需要打开 Runway 页面。请先在设置中粘贴 JWT 和 teamId。</div>
+        <div class="form-field-hint">
+          默认走 <b>Credits 优先队列</b>（排队 1-5 分钟，扣月度 credits）。Pro 会员建议保持此默认。<br>
+          勾选 Explore Mode 后改走慢队列（不扣 credits、适合大批量挂机）。
+        </div>
       </div>
     </main>
 
     <footer class="sticky-footer">
+      <button id="clearCacheBtn" class="btn btn-secondary" title="清空已缓存的参考图、全局提示词和表单状态">清空缓存</button>
       <button id="cancelTaskBtn" class="btn btn-secondary">取消</button>
       <button id="saveTaskBtn" class="btn btn-primary">添加任务</button>
     </footer>

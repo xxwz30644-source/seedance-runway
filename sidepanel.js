@@ -12,8 +12,9 @@
  *   - chrome.storage.onChanged 监听 batchTasks，立即刷新
  */
 
-import { getImageRecord, putImageRecord } from './image-store.js';
-import { createZip, parseZip } from './zip-utils.js';
+import { classifyError } from './core/error-classifier.js';
+import { exportTasks, importTasks, batchDownloadVideos } from './core/batch-transfer.js';
+import { getImageBlob, putImageRecord } from './image-store.js';
 
 const STATE = {
   filterPlatform: 'all',
@@ -22,7 +23,7 @@ const STATE = {
   health: { jimeng: { running: 0, limit: 3 }, runway: { running: 0, limit: 2 } },
   autoRun: false,
   pollTimer: null,
-  exportSelectMode: false,
+  selectMode: null,  // null | 'export' | 'download'
 };
 
 const $ = (id) => document.getElementById(id);
@@ -69,6 +70,19 @@ function renderHealth() {
   if (dailyEl && r.dailyCap) {
     dailyEl.textContent = `今日 ${r.dailyCount}/${r.dailyCap}`;
     dailyEl.classList.toggle('cap', !!r.dailyCapReached);
+  }
+  // v1.3.0 B3：Runway 高峰期提示（仅标签提示，不改变行为）
+  const peakEl = $('runwayPeakHint');
+  if (peakEl) {
+    if (r.isPeakHour) {
+      const qs = (r.queueInProgress != null && r.queueLimit != null)
+        ? ` · 实时队列 ${r.queueInProgress}/${r.queueLimit}`
+        : '';
+      peakEl.textContent = `⏰ 当前 Runway 高峰期（美东晚高峰）${qs}`;
+      peakEl.hidden = false;
+    } else {
+      peakEl.hidden = true;
+    }
   }
 }
 
@@ -181,22 +195,36 @@ function renderTaskCard(task) {
   }
   if (status === 'pending' || status === 'failed' || status === 'cancelled' || status === 'completed') {
     actions.push(`<button data-action="edit" data-task-id="${task.id}">编辑</button>`);
+    // v1.2.0：复制 × N——共享 imageId 零拷贝，一键复制多份同 prompt + 同图的任务
+    actions.push(`<button data-action="duplicate-n" data-task-id="${task.id}" title="复制多份同一任务（同 prompt 同图）">复制×N</button>`);
     actions.push(`<button data-action="delete" data-task-id="${task.id}">删除</button>`);
   }
 
-  // 防御：历史数据里 task.error 可能是对象（旧 bug 残留），coerce 一次
-  const errorText = task.error == null
-    ? ''
-    : (typeof task.error === 'string'
-        ? task.error
-        : (task.error.message
-            || (() => { try { return JSON.stringify(task.error); } catch { return '任务失败'; } })()));
-  const errorHtml = errorText
-    ? `<div class="task-error">${escapeHtml(errorText)}</div>`
-    : '';
+  // 错误分层展示：用 classifyError 把原始错误转成 { title/message/suggestion/actions }
+  let errorHtml = '';
+  if (task.error) {
+    const cls = classifyError(task.error);
+    const severityClass = cls.severity === 'warning' ? 'task-error warn' : 'task-error';
+    const actionBtns = cls.actions.map(a => {
+      const taskAttr = a.id === 'edit-retry' ? `data-action="edit" data-task-id="${task.id}"` :
+                        a.id === 'retry' ? `data-action="retry" data-task-id="${task.id}"` :
+                        a.id === 'replace-image' ? `data-action="edit" data-task-id="${task.id}"` :
+                        a.id === 'relogin' ? `data-action="open-runway"` :
+                        a.id === 'view-log' ? `data-action="open-settings"` : '';
+      return `<button class="err-action-btn" ${taskAttr}>${escapeHtml(a.label)}</button>`;
+    }).join('');
+    errorHtml = `
+      <div class="${severityClass}">
+        <div class="err-title"><strong>${escapeHtml(cls.title)}</strong></div>
+        <div class="err-msg">${escapeHtml(cls.message)}</div>
+        <div class="err-hint">${escapeHtml(cls.suggestion)}</div>
+        <div class="err-actions">${actionBtns}</div>
+      </div>
+    `;
+  }
 
-  const promptText = task.promptText || task.config?.prompt || '(无提示词)';
   const taskName = task.name || '';
+  const promptText = task.promptText || task.config?.prompt || '(无提示词)';
   const aspectRatio = task.config?.aspectRatio || '';
   const duration = task.config?.duration || task.config?.durationSeconds || '—';
 
@@ -208,7 +236,7 @@ function renderTaskCard(task) {
 
   return `
     <div class="${cardClasses}" data-task-id-card="${task.id}">
-      <input type="checkbox" class="export-check" data-export-id="${task.id}">
+      <input type="checkbox" class="select-check" data-select-id="${task.id}">
       <div class="task-thumb">${thumbHtml}</div>
       <div class="task-body">
         <div class="task-row1">
@@ -217,7 +245,7 @@ function renderTaskCard(task) {
           <span class="task-meta-sep">·</span>
           <span>${duration}S</span>
         </div>
-        ${taskName ? `<div class="task-name" style="font-size:11px;font-weight:700;color:var(--accent-bright);margin-bottom:2px;letter-spacing:0.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(taskName)}</div>` : ''}
+        ${taskName ? `<div class="task-name">${escapeHtml(taskName)}</div>` : ''}
         <div class="task-prompt">${escapeHtml(promptText)}</div>
         <div class="task-status-row">
           <span class="status-badge status-${status}">${statusLabel(status)}</span>
@@ -262,11 +290,25 @@ function handleTaskAction(action, taskId) {
       if (r.success) { toast('已删除'); loadAll(); }
       else toast('删除失败：' + r.error);
     });
+  } else if (action === 'duplicate-n') {
+    // v1.2.0：复制 × N（1-10 份，共享 imageId 零拷贝）
+    const raw = prompt('要复制几份？（1-10，同 prompt + 同参考图，立即入队）', '3');
+    if (raw == null) return;
+    const n = Math.max(1, Math.min(10, parseInt(raw, 10) || 0));
+    if (!n) { toast('请输入 1-10 之间的数字'); return; }
+    send({ type: 'DUPLICATE_BATCH_TASK_N', taskId, count: n }).then((r) => {
+      if (r?.success) { toast(`已复制 ${n} 份`); loadAll(); }
+      else toast('复制失败：' + (r?.error || '未知错误'));
+    });
   } else if (action === 'edit' || action === 'retry') {
     chrome.windows.create({
       url: chrome.runtime.getURL(`add_task.html?${action === 'retry' ? 'duplicate' : 'edit'}=${encodeURIComponent(taskId)}`),
       type: 'popup', width: 760, height: 720
     });
+  } else if (action === 'open-runway') {
+    chrome.tabs.create({ url: 'https://runwayml.com/' });
+  } else if (action === 'open-settings') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
   }
 }
 
@@ -283,7 +325,7 @@ function bindEvents() {
   });
 
   $('settingsBtn').addEventListener('click', () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('runway-debug.html') });
+    chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
   });
 
   $('startBtn').addEventListener('click', async () => {
@@ -318,6 +360,36 @@ function bindEvents() {
     }
   });
 
+  // v2.1.0：定期自动重试失败任务
+  const periodicToggle = $('periodicRetryToggle');
+  if (periodicToggle) {
+    send({ type: 'GET_PERIODIC_RETRY' }).then((r) => {
+      if (r?.success) periodicToggle.checked = !!r.enabled;
+    });
+    periodicToggle.addEventListener('change', async (e) => {
+      const enabled = e.target.checked;
+      const r = await send({ type: 'SET_PERIODIC_RETRY', enabled });
+      if (r?.success) {
+        toast(enabled ? '已开启每 10 分钟自动重试' : '已关闭定期重试');
+      } else {
+        e.target.checked = !enabled;
+        toast('切换失败：' + (r?.error || '未知错误'));
+      }
+    });
+  }
+  const periodicNowBtn = $('periodicRetryNowBtn');
+  if (periodicNowBtn) {
+    periodicNowBtn.addEventListener('click', async () => {
+      periodicNowBtn.disabled = true;
+      periodicNowBtn.textContent = '扫描中...';
+      const r = await send({ type: 'RUN_PERIODIC_RETRY_NOW' });
+      periodicNowBtn.disabled = false;
+      periodicNowBtn.textContent = '立即扫';
+      toast(r?.success ? '已触发一次扫描，检查任务列表' : '扫描失败');
+      loadAll();
+    });
+  }
+
   // 筛选
   document.querySelectorAll('[data-filter-platform]').forEach((el) => {
     el.addEventListener('click', () => {
@@ -343,62 +415,51 @@ function bindEvents() {
     }
   });
 
-  // ─── 导入 / 导出 ─────────────────────────────────────────
-  $('exportBtn').addEventListener('click', () => {
-    $('exportOverlay').classList.add('show');
-  });
-  $('exportCancelBtn').addEventListener('click', () => {
-    $('exportOverlay').classList.remove('show');
-  });
-  $('exportOverlay').addEventListener('click', (e) => {
-    if (e.target === $('exportOverlay')) $('exportOverlay').classList.remove('show');
-  });
-  $('exportAllBtn').addEventListener('click', () => {
-    $('exportOverlay').classList.remove('show');
-    exportFiltered();
-  });
-  $('exportSelectBtn').addEventListener('click', () => {
-    $('exportOverlay').classList.remove('show');
-    enterExportSelectMode();
-  });
-  $('exportSelectedBtn').addEventListener('click', () => {
-    const ids = [...document.querySelectorAll('.export-check:checked')].map(cb => cb.dataset.exportId);
-    if (ids.length === 0) { toast('请至少勾选一个任务'); return; }
-    exitExportSelectMode();
-    exportByIds(ids);
-  });
-  $('exportBarCancel').addEventListener('click', exitExportSelectMode);
-
+  // ─── 批量导入 / 导出 / 视频下载 ─────────────────────────
+  $('exportBtn').addEventListener('click', () => showSelectOverlay('export'));
   $('importBtn').addEventListener('click', () => {
     $('importFileInput').value = '';
     $('importFileInput').click();
   });
-  $('importFileInput').addEventListener('change', (e) => {
-    const file = e.target.files?.[0];
-    if (file) importFromZip(file);
+  $('importFileInput').addEventListener('change', handleImport);
+  $('batchDownloadBtn').addEventListener('click', () => showSelectOverlay('download'));
+
+  // 选择浮层
+  $('selectAllFilteredBtn').addEventListener('click', () => {
+    const mode = STATE.selectMode;
+    hideSelectOverlay();
+    if (mode === 'export') handleExport(getFilteredTasks());
+    else if (mode === 'download') handleBatchDownload(getFilteredTasks());
+  });
+  $('selectPickBtn').addEventListener('click', () => {
+    hideSelectOverlay();
+    enterSelectMode();
+  });
+  $('selectCancelBtn').addEventListener('click', hideSelectOverlay);
+  $('selectOverlay').addEventListener('click', (e) => {
+    if (e.target === $('selectOverlay')) hideSelectOverlay();
   });
 
-  $('batchDownloadBtn').addEventListener('click', batchDownloadVideos);
+  // 勾选模式底部栏
+  $('selectConfirmBtn').addEventListener('click', () => {
+    const ids = [...document.querySelectorAll('.select-check:checked')].map(cb => cb.dataset.selectId);
+    if (ids.length === 0) { toast('请至少勾选一个任务'); return; }
+    const idSet = new Set(ids);
+    const selected = STATE.tasks.filter(t => idSet.has(t.id));
+    const mode = STATE.selectMode;
+    exitSelectMode();
+    if (mode === 'export') handleExport(selected);
+    else if (mode === 'download') handleBatchDownload(selected);
+  });
+  $('selectBarCancel').addEventListener('click', exitSelectMode);
+
+  // 勾选计数实时更新
+  document.addEventListener('change', (e) => {
+    if (e.target.classList.contains('select-check')) updateSelectCount();
+  });
 }
 
-// ─── 启动 ────────────────────────────────────────────────
-
-bindEvents();
-loadAll();
-startPolling();
-
-// ─── 导出/导入逻辑 ─────────────────────────────────────────
-
-function enterExportSelectMode() {
-  STATE.exportSelectMode = true;
-  document.body.classList.add('export-select-mode');
-}
-
-function exitExportSelectMode() {
-  STATE.exportSelectMode = false;
-  document.body.classList.remove('export-select-mode');
-  document.querySelectorAll('.export-check').forEach(cb => cb.checked = false);
-}
+// ─── 批量导入/导出/下载视频 ─────────────────────────────
 
 function getFilteredTasks() {
   return STATE.tasks.filter((t) => {
@@ -412,170 +473,120 @@ function getFilteredTasks() {
   });
 }
 
-function exportFiltered() {
-  const tasks = getFilteredTasks();
-  if (tasks.length === 0) { toast('当前筛选下没有任务'); return; }
-  exportByIds(tasks.map(t => t.id));
+function setTransferProgress(text) {
+  const el = $('transferProgress');
+  if (!el) return;
+  if (text) { el.textContent = text; el.hidden = false; }
+  else { el.hidden = true; }
 }
 
-async function exportByIds(taskIds) {
+async function handleExport(tasks) {
+  if (!tasks || tasks.length === 0) { toast('没有可导出的任务'); return; }
+  const btn = $('exportBtn'); btn.disabled = true;
   try {
-    toast('正在打包…');
-    const idSet = new Set(taskIds);
-    const tasksToExport = STATE.tasks.filter(t => idSet.has(t.id));
-
-    const cleaned = tasksToExport.map(t => {
-      const c = { ...t };
-      c.status = 'pending';
-      c.error = null;
-      c.runwayTaskId = null;
-      c.historyRecordId = null;
-      c.videoUrl = null;
-      c.thumbnailUrl = null;
-      c.queueInfo = null;
-      return c;
+    const result = await exportTasks(tasks, getImageBlob, (done, total, phase) => {
+      const label = phase === 'images' ? '读图' : phase === 'zipping' ? '打包' : '准备';
+      setTransferProgress(`${label} ${done}/${total}`);
     });
-
-    const imageIds = new Set();
-    for (const t of cleaned) {
-      if (t.images) {
-        for (const img of t.images) {
-          if (img.imageId) imageIds.add(img.imageId);
-        }
-      }
-    }
-
-    const zipFiles = [];
-    zipFiles.push({
-      name: 'tasks.json',
-      data: new TextEncoder().encode(JSON.stringify(cleaned, null, 2)),
-    });
-
-    for (const imageId of imageIds) {
-      try {
-        const record = await getImageRecord(imageId);
-        if (record?.blob) {
-          const ab = await record.blob.arrayBuffer();
-          zipFiles.push({
-            name: `images/${imageId}.bin`,
-            data: new Uint8Array(ab),
-          });
-        }
-      } catch (e) {
-        console.warn('读取图片失败:', imageId, e);
-      }
-    }
-
-    const blob = createZip(zipFiles);
-    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `shoploop-export-${ts}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast(`已导出 ${tasksToExport.length} 个任务`);
+    toast(`已导出 ${result.taskCount} 个任务（${(result.zipSize / 1024).toFixed(0)} KB）`);
   } catch (e) {
     console.error('导出失败:', e);
     toast('导出失败：' + (e.message || '未知错误'));
+  } finally {
+    btn.disabled = false;
+    setTransferProgress('');
   }
 }
 
-async function importFromZip(file) {
+async function handleImport(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const btn = $('importBtn'); btn.disabled = true;
+  setTransferProgress('解析 zip...');
   try {
-    toast('正在导入…');
-    const buffer = await file.arrayBuffer();
-    const entries = parseZip(buffer);
-
-    const tasksEntry = entries.find(e => e.name === 'tasks.json');
-    if (!tasksEntry) { toast('ZIP 中找不到 tasks.json'); return; }
-
-    const tasksJson = new TextDecoder().decode(tasksEntry.data);
-    const tasks = JSON.parse(tasksJson);
-    if (!Array.isArray(tasks) || tasks.length === 0) { toast('没有可导入的任务'); return; }
-
-    const imageEntries = entries.filter(e => e.name.startsWith('images/'));
-    for (const ie of imageEntries) {
-      const imageId = ie.name.replace('images/', '').replace('.bin', '');
-      if (!imageId) continue;
-      const blob = new Blob([ie.data]);
-      await putImageRecord({ id: imageId, blob });
-    }
-
-    let imported = 0;
-    for (const task of tasks) {
-      task.id = crypto.randomUUID();
-      task.status = 'pending';
-      task.error = null;
-      task.runwayTaskId = null;
-      task.historyRecordId = null;
-      task.videoUrl = null;
-      task.thumbnailUrl = null;
-      task.queueInfo = null;
-      task.createdAt = Date.now();
-
-      const r = await send({ type: 'ADD_BATCH_TASK', task });
-      if (r?.success) imported++;
-    }
-
+    const result = await importTasks(
+      file,
+      putImageRecord,
+      async (tasks) => {
+        // v1.2.0：批量导入走 bulk 通道，一次性写 storage，避免 N 次 save 卡顿
+        const r = await send({ type: 'ADD_BATCH_TASKS_BULK', tasks });
+        if (r?.success === false) throw new Error(r.error || '批量添加任务失败');
+      }
+    );
+    const msg = result.skipped > 0
+      ? `导入 ${result.imported} 个，跳过 ${result.skipped} 个（引用图片缺失）`
+      : `已导入 ${result.imported} 个任务`;
+    toast(msg);
     await loadAll();
-    toast(`已导入 ${imported} 个任务`);
   } catch (e) {
     console.error('导入失败:', e);
     toast('导入失败：' + (e.message || '未知错误'));
+  } finally {
+    btn.disabled = false;
+    setTransferProgress('');
   }
 }
 
-async function batchDownloadVideos() {
-  const completed = getFilteredTasks().filter(t => t.status === 'completed' && t.videoUrl);
-  if (completed.length === 0) {
-    toast('当前筛选下没有可下载的已完成任务');
-    return;
-  }
+async function handleBatchDownload(tasks) {
+  if (!tasks || tasks.length === 0) { toast('没有可操作的任务'); return; }
+  const completed = tasks.filter(t => t.status === 'completed' && t.videoUrl);
+  if (completed.length === 0) { toast('选中的任务里没有已完成的视频'); return; }
+  if (!confirm(`将下载 ${completed.length} 个视频并打包（并发 3，可能要一会儿），继续？`)) return;
 
+  const btn = $('batchDownloadBtn'); btn.disabled = true;
   try {
-    toast(`正在下载 ${completed.length} 个视频…`);
-    const zipFiles = [];
-    let downloaded = 0;
-
-    for (const task of completed) {
-      try {
-        const resp = await fetch(task.videoUrl);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const ab = await resp.arrayBuffer();
-
-        const ext = task.videoUrl.match(/\.(mp4|webm|mov)/i)?.[1] || 'mp4';
-        const label = (task.name || task.promptText || 'video').slice(0, 60).replace(/[\\/:*?"<>|]/g, '_');
-        const name = `${String(downloaded + 1).padStart(2, '0')}_${label}.${ext}`;
-
-        zipFiles.push({ name, data: new Uint8Array(ab) });
-        downloaded++;
-        toast(`已下载 ${downloaded}/${completed.length}…`);
-      } catch (e) {
-        console.warn('下载视频失败:', task.videoUrl, e);
-      }
-    }
-
-    if (zipFiles.length === 0) {
-      toast('所有视频下载失败');
-      return;
-    }
-
-    toast('正在打包…');
-    const blob = createZip(zipFiles);
-    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `shoploop-videos-${ts}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast(`已打包 ${zipFiles.length} 个视频`);
+    const result = await batchDownloadVideos(tasks, {
+      concurrency: 3,
+      onProgress: (done, total) => setTransferProgress(`下载 ${done}/${total}`)
+    });
+    const msg = result.failed > 0
+      ? `已打包 ${result.downloaded} 个，${result.failed} 个失败（见 zip 里的 failed.csv）`
+      : `已打包 ${result.downloaded} 个视频`;
+    toast(msg);
   } catch (e) {
     console.error('批量下载失败:', e);
     toast('批量下载失败：' + (e.message || '未知错误'));
+  } finally {
+    btn.disabled = false;
+    setTransferProgress('');
   }
 }
+
+// ─── 选择模式（勾选导出/下载） ──────────────────────────
+
+function showSelectOverlay(mode) {
+  STATE.selectMode = mode;
+  const title = mode === 'export' ? '导出任务' : '打包下载视频';
+  $('selectMenuTitle').textContent = title;
+  $('selectOverlay').classList.add('show');
+}
+
+function hideSelectOverlay() {
+  $('selectOverlay').classList.remove('show');
+}
+
+function enterSelectMode() {
+  document.body.classList.add('select-mode');
+  updateSelectCount();
+}
+
+function exitSelectMode() {
+  document.body.classList.remove('select-mode');
+  STATE.selectMode = null;
+  document.querySelectorAll('.select-check').forEach(cb => cb.checked = false);
+}
+
+function updateSelectCount() {
+  const count = document.querySelectorAll('.select-check:checked').length;
+  const el = $('selectCount');
+  if (el) el.textContent = `已选 ${count} 个`;
+}
+
+// ─── 启动 ────────────────────────────────────────────────
+
+bindEvents();
+loadAll();
+startPolling();
 
 // ─── Footer 交互（避开 MV3 CSP 对内联 <script> 的禁用） ───
 

@@ -460,44 +460,9 @@
       line-height: 1;
     }
 
-    /* ─── IMPORT / EXPORT ──────────────────────────────────── */
+    /* ─── SELECT MODE (勾选导出/下载) ─────────────────────── */
 
-    .actions-io {
-      padding: 0 16px 0;
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 4px;
-    }
-
-    .export-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 200;
-      background: rgba(6, 8, 15, 0.75);
-      align-items: center;
-      justify-content: center;
-    }
-    .export-overlay.show { display: flex; }
-    .export-menu {
-      background: var(--surface-2);
-      border: 1px solid var(--border-bright);
-      border-radius: 4px;
-      padding: 16px 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      min-width: 240px;
-    }
-    .export-menu-title {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      color: var(--text);
-      margin-bottom: 4px;
-    }
-
-    .task-card .export-check {
+    .task-card .select-check {
       display: none;
       position: absolute;
       top: 8px;
@@ -508,9 +473,37 @@
       cursor: pointer;
       z-index: 10;
     }
-    body.export-select-mode .task-card .export-check { display: block; }
+    body.select-mode .task-card .select-check { display: block; }
 
-    .export-bar {
+    .select-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(6, 8, 15, 0.75);
+      align-items: center;
+      justify-content: center;
+    }
+    .select-overlay.show { display: flex; }
+    .select-menu {
+      background: var(--surface-2);
+      border: 1px solid var(--border-bright);
+      border-radius: 4px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 260px;
+    }
+    .select-menu-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .select-bar {
       display: none;
       position: fixed;
       bottom: 0;
@@ -522,8 +515,54 @@
       padding: 10px 16px;
       gap: 6px;
       justify-content: center;
+      align-items: center;
     }
-    body.export-select-mode .export-bar { display: flex; }
+    body.select-mode .select-bar { display: flex; }
+    .select-bar .select-count {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-mid);
+      margin-right: auto;
+    }
+
+    /* ─── TRANSFER BAR（批量导入/导出/打包下载）──────────────── */
+
+    .transfer-bar {
+      padding: 8px 16px 12px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+    }
+    .transfer-bar .btn-sm {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      padding: 5px 10px;
+      border: 1px solid var(--border-bright);
+      background: var(--surface-2);
+      color: var(--text-mid);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .transfer-bar .btn-sm:hover {
+      border-color: var(--accent);
+      color: var(--accent-bright);
+      background: rgba(167, 139, 250, 0.08);
+    }
+    .transfer-bar .btn-sm:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .transfer-progress {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-mid);
+      margin-left: auto;
+      letter-spacing: 0.05em;
+    }
 
     /* ─── FILTERS ─────────────────────────────────────────────── */
 
@@ -815,16 +854,47 @@
       color: var(--bg-deep);
     }
 
+    .task-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-bright);
+      margin-bottom: 2px;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: var(--mono);
+    }
     .task-error {
       margin-top: 6px;
-      padding: 5px 8px;
+      padding: 6px 8px;
       background: var(--danger-soft);
       border-left: 2px solid var(--danger);
       color: var(--danger);
       font-size: 10px;
-      line-height: 1.4;
-      letter-spacing: 0.03em;
+      line-height: 1.5;
+      letter-spacing: 0.02em;
     }
+    .task-error.warn {
+      background: var(--warning-soft);
+      border-left-color: var(--warning);
+      color: var(--warning);
+    }
+    .task-error .err-title { font-size: 11px; margin-bottom: 2px; }
+    .task-error .err-msg { color: var(--text); margin-bottom: 3px; }
+    .task-error .err-hint { color: var(--text-mid); font-size: 10px; margin-bottom: 5px; }
+    .task-error .err-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+    .task-error .err-action-btn {
+      font-size: 10px;
+      padding: 2px 8px;
+      background: transparent;
+      border: 1px solid currentColor;
+      color: inherit;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: var(--mono);
+    }
+    .task-error .err-action-btn:hover { background: currentColor; color: var(--bg-deep); }
     .task-eta {
       font-family: var(--mono);
       font-size: 10px;
@@ -1127,7 +1197,7 @@
         </svg>
         SHOPLOOP
       </div>
-      <div class="lockup-sub">主控台 · v1.0.9</div>
+      <div class="lockup-sub">主控台 · v1.1.0</div>
     </div>
     <div class="head-tools">
       <button class="icon-btn" id="refreshBtn" title="刷新">↻</button>
@@ -1135,6 +1205,25 @@
     </div>
   </div>
 </header>
+
+<div id="tasksPanel">
+
+<!-- ─── 定期自动重试失败任务（v2.1.0） ─── -->
+<label class="autopilot" id="periodicRetryLabel" style="background: rgba(234,88,12,0.08); border: 1px solid rgba(234,88,12,0.3); margin-top: 6px;">
+  <div class="autopilot-info">
+    <span class="autopilot-led" style="background: #ea580c;"></span>
+    <div class="autopilot-text">
+      <div class="autopilot-label">定期重试失败任务</div>
+      <div class="autopilot-status" id="periodicRetryText">每 10 分钟扫一次（仅网络类失败）</div>
+    </div>
+  </div>
+  <div style="display: flex; gap: 6px; align-items: center;">
+    <button class="btn-sm" id="periodicRetryNowBtn" title="立即扫描一次" style="font-size: 11px;">立即扫</button>
+    <div class="switch">
+      <input type="checkbox" id="periodicRetryToggle">
+    </div>
+  </div>
+</label>
 
 <!-- ─── 挂机模式 ─── -->
 <label class="autopilot auto-run" id="autoRunLabel">
@@ -1162,6 +1251,7 @@
     <div class="name">Runway</div>
     <div class="stat" id="runwayStat">— <span class="sep">/</span> <span class="limit">—</span></div>
     <div class="meta">运行中 · 上限 · <span class="daily-quota" id="runwayDaily">今日 0/80</span></div>
+    <div id="runwayPeakHint" hidden style="margin-top:4px; font-size:11px; color:#b45309; background:#fef3c7; border:1px solid #fde68a; border-radius:4px; padding:2px 6px;">⏰ 高峰期</div>
   </div>
 </section>
 
@@ -1171,26 +1261,6 @@
   <button class="btn" id="startBtn"><span class="glyph">▶</span> 启动</button>
   <button class="btn" id="pauseBtn"><span class="glyph">⏸</span> 暂停</button>
   <button class="btn" id="clearBtn">清空</button>
-</div>
-<div class="actions-io">
-  <button class="btn" id="exportBtn"><span class="glyph">↑</span> 导出</button>
-  <button class="btn" id="importBtn"><span class="glyph">↓</span> 导入</button>
-  <button class="btn" id="batchDownloadBtn"><span class="glyph">⤓</span> 批量下载</button>
-</div>
-<input type="file" id="importFileInput" accept=".zip" style="display:none">
-
-<div class="export-overlay" id="exportOverlay">
-  <div class="export-menu">
-    <div class="export-menu-title">导出任务</div>
-    <button class="btn" id="exportAllBtn">导出全部（当前筛选）</button>
-    <button class="btn" id="exportSelectBtn">逐个勾选导出</button>
-    <button class="btn" id="exportCancelBtn">取消</button>
-  </div>
-</div>
-
-<div class="export-bar" id="exportBar">
-  <button class="btn primary" id="exportSelectedBtn"><span class="glyph">↑</span> 导出选中</button>
-  <button class="btn" id="exportBarCancel">取消</button>
 </div>
 
 <!-- ─── 筛选 ─── -->
@@ -1205,10 +1275,38 @@
   <span class="filter-pill" data-filter-status="failed,cancelled">异常</span>
 </div>
 
+<!-- ─── 批量导入 / 导出 / 视频下载 ─── -->
+<div class="transfer-bar">
+  <button class="btn-sm" id="exportBtn" title="导出当前筛选的任务（zip：tasks.json + tasks.csv + images/）">📤 导出任务</button>
+  <button class="btn-sm" id="importBtn" title="导入 zip 包（来自他人导出 / 备份恢复）">📥 导入任务</button>
+  <button class="btn-sm" id="batchDownloadBtn" title="打包下载当前筛选的已完成视频（并发 3）">⬇ 打包视频</button>
+  <input type="file" id="importFileInput" accept=".zip" style="display:none">
+  <span class="transfer-progress" id="transferProgress" hidden></span>
+</div>
+
+<!-- ─── 选择模式浮层 ─── -->
+<div class="select-overlay" id="selectOverlay">
+  <div class="select-menu">
+    <div class="select-menu-title" id="selectMenuTitle">选择操作范围</div>
+    <button class="btn" id="selectAllFilteredBtn">全部（当前筛选）</button>
+    <button class="btn" id="selectPickBtn">逐个勾选</button>
+    <button class="btn" id="selectCancelBtn">取消</button>
+  </div>
+</div>
+
+<!-- ─── 勾选模式底部栏 ─── -->
+<div class="select-bar" id="selectBar">
+  <span class="select-count" id="selectCount">已选 0 个</span>
+  <button class="btn primary" id="selectConfirmBtn">确认</button>
+  <button class="btn" id="selectBarCancel">取消</button>
+</div>
+
 <!-- ─── 任务列表 ─── -->
 <main class="task-list" id="taskList">
   <div class="empty">暂无任务</div>
 </main>
+
+</div><!-- /#tasksPanel -->
 
 <!-- ─── 提示条 ─── -->
 <div class="toast" id="toast"></div>
@@ -1239,6 +1337,15 @@
     </div>
     <div class="foot-body">
       <ul class="changelog-list">
+        <li><span class="ver">1.1.0</span><span class="desc">修复 addTask 吃掉 task.name 导致批量导入/任务名不生效的 bug <em>修复</em></span></li>
+        <li><span class="ver">1.1.0</span><span class="desc">批量导入 / 导出任务（zip：tasks.json + tasks.csv + images/，DEFLATE 压缩） <em>功能</em></span></li>
+        <li><span class="ver">1.1.0</span><span class="desc">批量下载视频（并发 3 + AbortController + failed.csv 失败清单） <em>功能</em></span></li>
+        <li><span class="ver">1.1.0</span><span class="desc">客户端前置预审：5 类内置敏感词 + 用户自定义词表（设置页增删） <em>功能</em></span></li>
+        <li><span class="ver">1.1.0</span><span class="desc">错误分层：6 类错误统一文案 + 可操作按钮（编辑重试 / 换图 / 重登录 / 查看日志） <em>体验</em></span></li>
+        <li><span class="ver">1.1.0</span><span class="desc">本地错误日志（IndexedDB 滚动 500 条）+ 设置页查看 / 筛选 / 导出 JSON <em>可观测</em></span></li>
+        <li><span class="ver">1.1.0</span><span class="desc">S3 上传 AbortController + 3 次指数退避重试（1s/3s/7s），动态 timeout <em>稳定性</em></span></li>
+        <li><span class="ver">1.1.0</span><span class="desc">图片压缩门禁：>1.5MB 或长边>2048 自动 Worker 压到 2048/q0.85 <em>稳定性</em></span></li>
+        <li><span class="ver">1.1.0</span><span class="desc">任务命名 + 表单缓存（add_task 意外关闭不丢输入，批量任务自动 _01/_02） <em>体验</em></span></li>
         <li><span class="ver">1.0.9</span><span class="desc">修复任务失败时显示 [object Object] 的错误格式化 bug <em>修复</em></span></li>
         <li><span class="ver">1.0.8</span><span class="desc">移除商业版 license 模块，准备开源 <em>清理</em></span></li>
         <li><span class="ver">1.0.7</span><span class="desc">底部增加作者署名横幅 <em>UI</em></span></li>
