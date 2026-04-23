@@ -122,6 +122,9 @@ function isActiveStatus(status) {
 }
 
 function renderTasks() {
+  // 选择模式下跳过重渲染，避免 checkbox 勾选状态被轮询刷掉
+  if (STATE.selectMode && document.body.classList.contains('select-mode')) return;
+
   const list = $('taskList');
 
   // 过滤
